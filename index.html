@@ -1,228 +1,1221 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PUZZLE CAM - EMAN 👻</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PUZZLE CAM - EMAN</title>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
-body{background:#000;overflow:hidden}
-#webcam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-#scene{position:fixed;inset:0}
-#hud-top{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;z-index:20;color:white;font-weight:900;text-shadow:0 0 8px #000}
-#hud-top span{background:rgba(0,0,0,.6);padding:6px 12px;border-radius:20px;font-size:13px}
-#frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78vw,380px);height:min(78vw,380px);border:4px solid #FFD700;z-index:10;pointer-events:none;transition:border-color .3s}
-#frame.done{border-color:#00ff88}
-#count{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:110px;font-weight:900;color:#FFD700;z-index:30;text-shadow:0 0 30px #000;display:none}
-#msg{position:absolute;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#00ff88;padding:8px 18px;border-radius:20px;font-weight:900;z-index:30;white-space:nowrap}
-#pieces{position:absolute;inset:0;z-index:15}
-.piece{position:absolute;background-size:380px 380px;border:1px solid rgba(255,255,255,.6);cursor:grab;transition:transform .15s;box-shadow:0 4px 15px rgba(0,0,0,.4)}
-.piece.correct{border:2px solid #00ff88;box-shadow:0 0 15px #00ff88}
-.piece.drag{border:3px solid #FFD700;transform:scale(1.08);z-index:99!important}
-#menu{position:fixed;bottom:12px;left:0;right:0;display:flex;gap:8px;justify-content:center;z-index:40;flex-wrap:wrap;padding:0 10px}
-.btn{padding:11px 16px;border-radius:20px;border:none;font-weight:900;cursor:pointer}
-.btn.active{background:#ff2d95;color:white}
-.btn:not(.active){background:rgba(255,255,255,.85);color:#000}
-#handDot{position:absolute;width:22px;height:22px;background:#FFD700;border:3px solid white;border-radius:50%;z-index:50;pointer-events:none;transform:translate(-50%,-50%);display:none;box-shadow:0 0 15px #FFD700}
-#handDot.pinch{background:#00ff88;width:32px;height:32px}
-.confetti{position:absolute;width:10px;height:10px;z-index:60;pointer-events:none}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
+
+:root {
+  --gold: #ffd700;
+  --green: #00ff99;
+  --glass: rgba(0,0,0,.72);
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: white;
+  touch-action: none;
+}
+
+#video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: brightness(.85);
+}
+
+#shade {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0,0,0,.5),
+    transparent 30%,
+    transparent 70%,
+    rgba(0,0,0,.6)
+  );
+}
+
+#top {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 30;
+  direction: ltr;
+}
+
+.pill {
+  background: var(--glass);
+  border: 1px solid #ffffff30;
+  padding: 9px 13px;
+  border-radius: 25px;
+  font-size: 12px;
+  font-weight: 900;
+  backdrop-filter: blur(10px);
+}
+
+#brand {
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+#progress {
+  color: white;
+}
+
+#board {
+  position: absolute;
+  width: min(78vw, 390px, 52vh);
+  height: min(78vw, 390px, 52vh);
+  left: 50%;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--gold);
+  box-shadow: 0 0 25px #ffd70066;
+  z-index: 5;
+  pointer-events: none;
+  transition: .3s;
+}
+
+#board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg,
+      transparent 33%,
+      #ffffff55 33.3%,
+      transparent 33.6%,
+      transparent 66.4%,
+      #ffffff55 66.7%,
+      transparent 67%
+    ),
+    linear-gradient(0deg,
+      transparent 33%,
+      #ffffff55 33.3%,
+      transparent 33.6%,
+      transparent 66.4%,
+      #ffffff55 66.7%,
+      transparent 67%
+    );
+}
+
+#board.done {
+  border-color: var(--green);
+  box-shadow: 0 0 35px #00ff9988;
+}
+
+#pieces {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.piece {
+  position: absolute;
+  background-repeat: no-repeat;
+  border: 1px solid #ffffffaa;
+  box-shadow: 0 5px 15px #0009;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.piece.drag {
+  z-index: 100 !important;
+  border: 3px solid var(--gold);
+  box-shadow: 0 0 22px #ffd700aa;
+  transform: scale(1.04);
+}
+
+.piece.correct {
+  border: 2px solid var(--green);
+  box-shadow: 0 0 13px #00ff9988;
+}
+
+#handDot {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 18px var(--gold);
+  z-index: 110;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+
+#handDot.pinching {
+  width: 30px;
+  height: 30px;
+  background: var(--green);
+  box-shadow: 0 0 20px var(--green);
+}
+
+#message {
+  position: fixed;
+  left: 50%;
+  top: calc(47% + min(39vw,195px,26vh) + 15px);
+  transform: translateX(-50%);
+  background: var(--glass);
+  border: 1px solid #ffffff30;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+  z-index: 30;
+  max-width: 94vw;
+}
+
+#count {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  font-size: 120px;
+  font-weight: 1000;
+  color: var(--gold);
+  text-shadow: 0 0 30px black, 0 0 30px var(--gold);
+  z-index: 150;
+}
+
+#status {
+  position: fixed;
+  bottom: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0009;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  z-index: 30;
+  white-space: nowrap;
+}
+
+#controls {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 120;
+}
+
+button {
+  border: none;
+  border-radius: 25px;
+  padding: 12px 17px;
+  font-weight: 900;
+  font-size: 13px;
+  color: #111;
+  background: white;
+  box-shadow: 0 5px 15px #0007;
+}
+
+button.primary {
+  background: var(--gold);
+}
+
+button:disabled {
+  opacity: .4;
+}
+
+#toast {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -10px);
+  padding: 12px 18px;
+  border: 1px solid var(--green);
+  background: #071b14;
+  color: var(--green);
+  border-radius: 15px;
+  font-weight: 900;
+  opacity: 0;
+  transition: .25s;
+  z-index: 200;
+  pointer-events: none;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.confetti {
+  position: fixed;
+  width: 9px;
+  height: 9px;
+  z-index: 180;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+@media(max-height:620px) {
+  #board {
+    top: 43%;
+    width: min(65vw, 46vh);
+    height: min(65vw, 46vh);
+  }
+
+  #message {
+    top: calc(43% + min(32.5vw,23vh) + 10px);
+  }
+
+  #status {
+    bottom: 65px;
+  }
+
+  button {
+    padding: 9px 13px;
+  }
+}
 </style>
 </head>
+
 <body>
-<video id="webcam" playsinline></video>
-<div id="scene">
-<div id="hud-top"><span>PUZZLE CAM - EMAN 👻</span><span id="progress">0 / 9 PIECES COLOCADAS</span></div>
-<div id="frame"></div>
-<div id="count">3</div>
-<div id="msg">ارفع ايدك للتصوير ✋</div>
+
+<video id="video" autoplay muted playsinline></video>
+<div id="shade"></div>
+
+<div id="top">
+  <div class="pill" id="brand">PUZZLE CAM · EMAN</div>
+  <div class="pill" id="progress">0 / 9</div>
+</div>
+
+<div id="board"></div>
 <div id="pieces"></div>
 <div id="handDot"></div>
+
+<div id="message">
+  اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋
 </div>
-<div id="menu">
-<button class="btn active" onclick="startGame(this)">📸 ابدأ من جديد</button>
-<button class="btn" onclick="toggleGhost(this)">👻 شبح ايمان</button>
-<button class="btn" onclick="location.reload()">🔄 إعادة</button>
+
+<div id="count">3</div>
+<div id="status">جارٍ تجهيز الكاميرا...</div>
+<div id="toast"></div>
+
+<div id="controls">
+  <button class="primary" id="start">📸 ابدأ التصوير</button>
+  <button id="save" disabled>⬇ حفظ الصورة</button>
+  <button id="reset">↻ إعادة</button>
 </div>
 
 <script>
-const video=document.getElementById('webcam');
-const frame=document.getElementById('frame');
-const countEl=document.getElementById('count');
-const msgEl=document.getElementById('msg');
-const piecesEl=document.getElementById('pieces');
-const progressEl=document.getElementById('progress');
-const dot=document.getElementById('handDot');
-let GRID=3, pieces=[], captured=null, handPos={x:0.5,y:0.5}, isPinch=false, dragged=null, dragOffset={x:0,y:0};
-let ghostOn=false, gameStarted=false, countdownDone=false;
+"use strict";
 
-// رسم الكاميرا على الكانفس عشان ناخد صورة
-function capturePhoto(){
-  const c=document.createElement('canvas'); c.width=380; c.height=380;
-  const ctx=c.getContext('2d');
-  // نحسب القص من الفيديو - زي الفيديو بالظبط
-  const vw=video.videoWidth, vh=video.videoHeight;
-  const size=Math.min(vw,vh);
-  const sx=(vw-size)/2, sy=(vh-size)/2;
-  ctx.save(); ctx.translate(380,0); ctx.scale(-1,1); // عكس عشان المراية
-  ctx.drawImage(video, sx, sy, size, size, 0, 0, 380, 380);
+/* =========================
+   ELEMENTS
+========================= */
+
+const $ = id => document.getElementById(id);
+
+const video = $("video");
+const board = $("board");
+const piecesLayer = $("pieces");
+const dot = $("handDot");
+const message = $("message");
+const progress = $("progress");
+const status = $("status");
+const countEl = $("count");
+const startBtn = $("start");
+const saveBtn = $("save");
+
+const GRID = 3;
+const TOTAL = GRID * GRID;
+
+/* =========================
+   STATE
+========================= */
+
+let hands = null;
+let stream = null;
+
+let photo = null;
+let pieces = [];
+
+let ready = false;
+let solved = false;
+let countdownRunning = false;
+
+let pinching = false;
+let dragged = null;
+
+let dragOffset = {x:0,y:0};
+
+let pointerDragId = null;
+let handEnabled = true;
+
+let lastSend = 0;
+let processing = false;
+let rafId = null;
+let toastTimer = null;
+
+/* =========================
+   HELPERS
+========================= */
+
+function say(text) {
+  message.textContent = text;
+}
+
+function toast(text) {
+  const el = $("toast");
+
+  el.textContent = text;
+  el.classList.add("show");
+
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+  }, 2000);
+}
+
+function boardRect() {
+  return board.getBoundingClientRect();
+}
+
+function dimensions() {
+  const r = boardRect();
+
+  return {
+    width: r.width,
+    height: r.height,
+    pw: r.width / GRID,
+    ph: r.height / GRID
+  };
+}
+
+function targetPosition(piece) {
+  const r = boardRect();
+  const d = dimensions();
+
+  return {
+    x: r.left + (piece.correct % GRID) * d.pw,
+    y: r.top + Math.floor(piece.correct / GRID) * d.ph
+  };
+}
+
+function closeEnough(a,b,distance) {
+  return (
+    Math.abs(a.x-b.x) < distance &&
+    Math.abs(a.y-b.y) < distance
+  );
+}
+
+/* =========================
+   CAMERA PHOTO
+========================= */
+
+function capturePhoto() {
+
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+
+  if (!w || !h) {
+    throw new Error("الكاميرا لم تصبح جاهزة بعد");
+  }
+
+  const canvas = document.createElement("canvas");
+
+  canvas.width = 600;
+  canvas.height = 600;
+
+  const ctx = canvas.getContext("2d", {
+    willReadFrequently: true
+  });
+
+  const size = Math.min(w,h);
+
+  const sx = (w-size)/2;
+  const sy = (h-size)/2;
+
+  ctx.save();
+
+  ctx.translate(600,0);
+  ctx.scale(-1,1);
+
+  ctx.drawImage(
+    video,
+    sx,sy,size,size,
+    0,0,600,600
+  );
+
   ctx.restore();
-  // فلتر ابيض واسود زي الفيديو
-  const imgData=ctx.getImageData(0,0,380,380);
-  const d=imgData.data;
-  for(let i=0;i<d.length;i+=4){ let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; d[i]=g; d[i+1]=g; d[i+2]=g; }
-  ctx.putImageData(imgData,0,0);
-  return c.toDataURL();
-}
 
-function startGame(btn){
-  if(btn) document.querySelectorAll('#menu .btn').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  piecesEl.innerHTML=''; pieces=[]; gameStarted=true; countdownDone=false;
-  frame.style.borderColor='#FFD700'; frame.classList.remove('done');
-  msgEl.textContent='استعد... 3';
-  let n=3;
-  countEl.style.display='block'; countEl.textContent=n;
-  let timer=setInterval(()=>{
-    n--; 
-    if(n>0){ countEl.textContent=n; msgEl.textContent='استعد... '+n; }
-    else { clearInterval(timer); countEl.style.display='none'; msgEl.textContent='تم التصوير! رتب القطع بإيدك'; captured=capturePhoto(); buildPuzzle(); countdownDone=true; }
-  },1000);
-}
+  // Grayscale filter
+  const image = ctx.getImageData(0,0,600,600);
+  const data = image.data;
 
-function buildPuzzle(){
-  piecesEl.innerHTML=''; pieces=[];
-  let fw=frame.offsetWidth, fh=frame.offsetHeight;
-  let fx=frame.offsetLeft, fy=frame.offsetTop;
-  let pw=fw/GRID, ph=fh/GRID;
-  let order=[...Array(GRID*GRID).keys()];
-  // خلط زي الفيديو
-  for(let i=order.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
-  order.forEach((correctIdx,i)=>{
-    let col=i%GRID, row=Math.floor(i/GRID);
-    let el=document.createElement('div');
-    el.className='piece';
-    el.style.width=pw+'px'; el.style.height=ph+'px';
-    el.style.left=(fx+col*pw)+'px'; el.style.top=(fy+row*ph)+'px';
-    el.style.backgroundImage=`url(${captured})`;
-    el.style.backgroundSize=`${fw}px ${fh}px`;
-    // مكان القطعة الصح في الصورة الأصلية
-    let cc=correctIdx%GRID, cr=Math.floor(correctIdx/GRID);
-    el.style.backgroundPosition=`${-cc*pw}px ${-cr*ph}px`;
-    el.dataset.correct=correctIdx; el.dataset.current=i;
-    piecesEl.appendChild(el);
-    pieces.push({el, correct:correctIdx, current:i, x:fx+col*pw, y:fy+row*ph});
-  });
-  checkWin();
-}
+  for(let i=0; i<data.length; i+=4) {
 
-function checkWin(){
-  let correct=0;
-  pieces.forEach(p=>{
-    // لو القطعة في مكانها الصح تقريبا
-    let fw=frame.offsetWidth, pw=fw/GRID;
-    let cc=p.correct%GRID, cr=Math.floor(p.correct/GRID);
-    let targetX=frame.offsetLeft+cc*pw, targetY=frame.offsetTop+cr*pw;
-    let dx=Math.abs(p.x-targetX), dy=Math.abs(p.y-targetY);
-    if(dx<18 && dy<18){ p.el.classList.add('correct'); correct++; }
-    else p.el.classList.remove('correct');
-  });
-  progressEl.textContent=`${correct} / 9 PIECES COLOCADAS`;
-  if(correct===9 && countdownDone){
-    frame.style.borderColor='#00ff88'; frame.classList.add('done');
-    msgEl.textContent='¡COMPLETO! EMAN 👻 - اقفل ايدك عشان تحفظ';
-    setTimeout(explode, 400);
-  }
-}
+    const gray =
+      0.299 * data[i] +
+      0.587 * data[i+1] +
+      0.114 * data[i+2];
 
-function explode(){
-  for(let i=0;i<120;i++){
-    let s=document.createElement('div'); s.className='confetti';
-    s.style.left='50%'; s.style.top='50%';
-    s.style.background=['#ff2d95','#FFD700','#00ff88','#00e5ff','#fff'][i%5];
-    document.body.appendChild(s);
-    let ang=Math.random()*Math.PI*2, dist=100+Math.random()*280;
-    s.animate([{transform:'translate(0,0) rotate(0deg)',opacity:1},{transform:`translate(${Math.cos(ang)*dist}px,${Math.sin(ang)*dist+180}px) rotate(720deg)`,opacity:0}],{duration:1400+Math.random()*800,easing:'cubic-bezier(.2,.8,.3,1)'}).onfinish=()=>s.remove();
-  }
-  navigator.vibrate&&navigator.vibrate([100,50,100]);
-}
-
-function toggleGhost(btn){
-  ghostOn=!ghostOn; btn.classList.toggle('active',ghostOn);
-  msgEl.textContent=ghostOn?'👻 شبح ايمان اشتغل - اضحك هيضحك معاك':'👻 شبح ايمان اتقفل';
-}
-
-// ===== تتبع الايد - القرصة Pinch =====
-const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({maxNumHands:1, modelComplexity:0, minDetectionConfidence:0.65, minTrackingConfidence:0.65});
-hands.onResults(res=>{
-  if(!res.multiHandLandmarks||!res.multiHandLandmarks.length){ dot.style.display='none'; return; }
-  let lm=res.multiHandLandmarks[0];
-  // نقطة الايد = بين الإبهام والسبابة - زي الفيديو
-  let thumb=lm[4], index=lm[8];
-  let pinchDist=Math.hypot(thumb.x-index.x, thumb.y-index.y);
-  let pinch = pinchDist < 0.05; // قرصة
-  let px=(1-(thumb.x+index.x)/2)*innerWidth;
-  let py=((thumb.y+index.y)/2)*innerHeight;
-  handPos={x:px/innerWidth, y:py/innerHeight};
-  dot.style.display='block'; dot.style.left=px+'px'; dot.style.top=py+'px';
-  dot.classList.toggle('pinch', pinch);
-
-  // لو عملت قبضة بعد الفوز = حفظ الصورة
-  let fingers=0;
-  if(lm[8].y<lm[6].y) fingers++;
-  if(lm[12].y<lm[10].y) fingers++;
-  if(lm[16].y<lm[14].y) fingers++;
-  if(lm[20].y<lm[18].y) fingers++;
-  if(fingers===0 && countdownDone && pieces.length>0){
-    let allCorrect = pieces.every(p=>p.el.classList.contains('correct'));
-    if(allCorrect){ msgEl.textContent='📸 اتحفظت يا ايمان! 👻'; }
+    data[i] = gray;
+    data[i+1] = gray;
+    data[i+2] = gray;
   }
 
-  if(!countdownDone) return;
+  ctx.putImageData(image,0,0);
 
-  if(pinch && !dragged){
-    // دور على القطعة اللي تحت ايدك
-    for(let p of pieces){
-      let rect=p.el.getBoundingClientRect();
-      if(px>=rect.left && px<=rect.right && py>=rect.top && py<=rect.bottom){
-        dragged=p; dragOffset={x:px-rect.left, y:py-rect.top};
-        p.el.classList.add('drag'); break;
+  return canvas.toDataURL("image/jpeg",0.88);
+}
+
+/* =========================
+   COUNTDOWN
+========================= */
+
+function startCountdown() {
+
+  if (!ready) {
+    toast("انتظري حتى تعمل الكاميرا");
+    return;
+  }
+
+  if (countdownRunning) return;
+
+  countdownRunning = true;
+
+  piecesLayer.innerHTML = "";
+  pieces = [];
+
+  photo = null;
+  solved = false;
+
+  saveBtn.disabled = true;
+
+  board.classList.remove("done");
+
+  let number = 3;
+
+  countEl.style.display = "grid";
+  countEl.textContent = number;
+
+  say("استعدي للتصوير...");
+
+  const timer = setInterval(() => {
+
+    number--;
+
+    if (number > 0) {
+
+      countEl.textContent = number;
+      say("استعدي... " + number);
+
+    } else {
+
+      clearInterval(timer);
+
+      countEl.style.display = "none";
+      countdownRunning = false;
+
+      try {
+
+        photo = capturePhoto();
+
+        buildPuzzle();
+
+        say("المسي الإبهام بالسبابة واسحبي القطع");
+
+      } catch(error) {
+
+        say(error.message);
+        toast(error.message);
       }
     }
-  } else if(pinch && dragged){
-    let nx=px-dragOffset.x, ny=py-dragOffset.y;
-    dragged.x=nx; dragged.y=ny;
-    dragged.el.style.left=nx+'px'; dragged.el.style.top=ny+'px';
-    // مغناطيس: لو قربت من مكانها الصح، الزقها
-    let fw=frame.offsetWidth, pw=fw/GRID;
-    let cc=dragged.correct%GRID, cr=Math.floor(dragged.correct/GRID);
-    let tx=frame.offsetLeft+cc*pw, ty=frame.offsetTop+cr*pw;
-    if(Math.abs(nx-tx)<22 && Math.abs(ny-ty)<22){
-      dragged.x=tx; dragged.y=ty;
-      dragged.el.style.left=tx+'px'; dragged.el.style.top=ty+'px';
-      dragged.el.classList.add('correct');
+
+  },850);
+}
+
+/* =========================
+   BUILD PUZZLE
+========================= */
+
+function buildPuzzle() {
+
+  piecesLayer.innerHTML = "";
+  pieces = [];
+
+  const r = boardRect();
+  const d = dimensions();
+
+  let order = Array.from(
+    {length:TOTAL},
+    (_,i)=>i
+  );
+
+  // Shuffle
+  do {
+
+    for(let i=order.length-1; i>0; i--) {
+
+      const j = Math.floor(Math.random()*(i+1));
+
+      [order[i],order[j]] =
+      [order[j],order[i]];
     }
-  } else if(!pinch && dragged){
-    dragged.el.classList.remove('drag');
-    // سناب للمكان الصح لو قريب
-    let fw=frame.offsetWidth, pw=fw/GRID;
-    let cc=dragged.correct%GRID, cr=Math.floor(dragged.correct/GRID);
-    let tx=frame.offsetLeft+cc*pw, ty=frame.offsetTop+cr*pw;
-    if(Math.abs(dragged.x-tx)<25 && Math.abs(dragged.y-ty)<25){
-      dragged.x=tx; dragged.y=ty;
-      dragged.el.style.left=tx+'px'; dragged.el.style.top=ty+'px';
+
+  } while(order.every((v,i)=>v===i));
+
+  order.forEach((correct,slot) => {
+
+    const col = slot % GRID;
+    const row = Math.floor(slot / GRID);
+
+    const el = document.createElement("div");
+
+    el.className = "piece";
+
+    el.style.width = d.pw + "px";
+    el.style.height = d.ph + "px";
+
+    el.style.left =
+      (r.left + col*d.pw) + "px";
+
+    el.style.top =
+      (r.top + row*d.ph) + "px";
+
+    el.style.backgroundImage =
+      `url("${photo}")`;
+
+    el.style.backgroundSize =
+      `${r.width}px ${r.height}px`;
+
+    const correctCol = correct % GRID;
+    const correctRow = Math.floor(correct/GRID);
+
+    el.style.backgroundPosition =
+      `${-correctCol*d.pw}px ${-correctRow*d.ph}px`;
+
+    const piece = {
+      el,
+      correct,
+      x:r.left + col*d.pw,
+      y:r.top + row*d.ph,
+      w:d.pw,
+      h:d.ph
+    };
+
+    // Touch and mouse control
+    el.addEventListener(
+      "pointerdown",
+      e => pointerStart(e,piece)
+    );
+
+    piecesLayer.appendChild(el);
+
+    pieces.push(piece);
+  });
+
+  updateProgress();
+}
+
+/* =========================
+   DRAG ENGINE
+========================= */
+
+function placePiece(piece,x,y) {
+
+  piece.x = x;
+  piece.y = y;
+
+  piece.el.style.left = x + "px";
+  piece.el.style.top = y + "px";
+}
+
+function snapPiece(piece) {
+
+  const target = targetPosition(piece);
+
+  const distance = Math.min(34,piece.w*0.22);
+
+  if(closeEnough(piece,target,distance)) {
+
+    placePiece(piece,target.x,target.y);
+
+    piece.el.classList.add("correct");
+
+    return true;
+  }
+
+  piece.el.classList.remove("correct");
+
+  return false;
+}
+
+function beginDrag(piece,x,y) {
+
+  if(!piece || piece.el.classList.contains("correct")) {
+    return;
+  }
+
+  if(dragged && dragged !== piece) {
+    return;
+  }
+
+  dragged = piece;
+
+  const rect = piece.el.getBoundingClientRect();
+
+  dragOffset = {
+    x:x-rect.left,
+    y:y-rect.top
+  };
+
+  piece.el.classList.add("drag");
+}
+
+function moveDrag(x,y) {
+
+  if(!dragged) return;
+
+  placePiece(
+    dragged,
+    x-dragOffset.x,
+    y-dragOffset.y
+  );
+}
+
+function endDrag() {
+
+  if(!dragged) return;
+
+  const piece = dragged;
+
+  piece.el.classList.remove("drag");
+
+  snapPiece(piece);
+
+  dragged = null;
+
+  updateProgress();
+}
+
+function findPiece(x,y) {
+
+  for(let i=pieces.length-1;i>=0;i--) {
+
+    const p = pieces[i];
+
+    if(p.el.classList.contains("correct")) {
+      continue;
     }
-    dragged=null;
-    checkWin();
+
+    const r = p.el.getBoundingClientRect();
+
+    if(
+      x>=r.left &&
+      x<=r.right &&
+      y>=r.top &&
+      y<=r.bottom
+    ) {
+      return p;
+    }
+  }
+
+  return null;
+}
+
+/* =========================
+   POINTER CONTROL
+========================= */
+
+function pointerStart(e,piece) {
+
+  if(!photo || dragged || pointerDragId !== null) {
+    return;
+  }
+
+  if(piece.el.classList.contains("correct")) {
+    return;
+  }
+
+  e.preventDefault();
+
+  pointerDragId = e.pointerId;
+
+  handEnabled = false;
+
+  beginDrag(piece,e.clientX,e.clientY);
+
+  try {
+    piece.el.setPointerCapture(e.pointerId);
+  } catch(e) {}
+}
+
+window.addEventListener("pointermove",e=> {
+
+  if(pointerDragId !== e.pointerId) return;
+
+  moveDrag(e.clientX,e.clientY);
+
+});
+
+function finishPointer(e) {
+
+  if(pointerDragId !== e.pointerId) return;
+
+  pointerDragId = null;
+
+  endDrag();
+
+  handEnabled = true;
+}
+
+window.addEventListener("pointerup",finishPointer);
+window.addEventListener("pointercancel",finishPointer);
+
+/* =========================
+   HAND TRACKING
+========================= */
+
+function onHandResults(results) {
+
+  const landmarks =
+    results.multiHandLandmarks?.[0];
+
+  if(!landmarks) {
+
+    dot.style.display = "none";
+
+    if(pinching && dragged && handEnabled) {
+      endDrag();
+    }
+
+    pinching = false;
+
+    return;
+  }
+
+  const thumb = landmarks[4];
+  const index = landmarks[8];
+
+  const distance = Math.hypot(
+    thumb.x-index.x,
+    thumb.y-index.y
+  );
+
+  const pinch = distance < 0.052;
+
+  const x =
+    (1-(thumb.x+index.x)/2)*innerWidth;
+
+  const y =
+    ((thumb.y+index.y)/2)*innerHeight;
+
+  dot.style.display = "block";
+  dot.style.left = x + "px";
+  dot.style.top = y + "px";
+
+  dot.classList.toggle("pinching",pinch);
+
+  if(!photo || !handEnabled) {
+    pinching = pinch;
+    return;
+  }
+
+  // Start dragging
+  if(pinch && !pinching && !dragged) {
+
+    const piece = findPiece(x,y);
+
+    if(piece) {
+      beginDrag(piece,x,y);
+    }
+  }
+
+  // Move
+  if(pinch && dragged) {
+    moveDrag(x,y);
+  }
+
+  // Release
+  if(!pinch && pinching && dragged) {
+    endDrag();
+  }
+
+  pinching = pinch;
+}
+
+/* =========================
+   PROGRESS & WIN
+========================= */
+
+function updateProgress() {
+
+  const correct = pieces.filter(
+    p=>p.el.classList.contains("correct")
+  ).length;
+
+  progress.textContent =
+    `${correct} / ${TOTAL}`;
+
+  if(correct === TOTAL && !solved) {
+
+    solved = true;
+
+    board.classList.add("done");
+
+    say("ممتاز! اكتملت الصورة 🎉");
+
+    saveBtn.disabled = false;
+
+    celebrate();
+  }
+}
+
+/* =========================
+   CELEBRATION
+========================= */
+
+function celebrate() {
+
+  const colors = [
+    "#ff2d95",
+    "#ffd700",
+    "#00ff99",
+    "#00e5ff",
+    "#ffffff"
+  ];
+
+  for(let i=0;i<90;i++) {
+
+    const el = document.createElement("div");
+
+    el.className = "confetti";
+
+    el.style.left = "50%";
+    el.style.top = "45%";
+
+    el.style.background =
+      colors[i%colors.length];
+
+    document.body.appendChild(el);
+
+    const angle = Math.random()*Math.PI*2;
+    const distance = 100+Math.random()*250;
+
+    const animation = el.animate(
+      [
+        {
+          transform:"translate(0,0) rotate(0)",
+          opacity:1
+        },
+        {
+          transform:
+            `translate(${Math.cos(angle)*distance}px,
+            ${Math.sin(angle)*distance+180}px)
+            rotate(720deg)`,
+          opacity:0
+        }
+      ],
+      {
+        duration:1300+Math.random()*700,
+        easing:"cubic-bezier(.2,.8,.3,1)"
+      }
+    );
+
+    animation.onfinish = ()=>el.remove();
+  }
+
+  if(navigator.vibrate) {
+    navigator.vibrate([100,50,100]);
+  }
+}
+
+/* =========================
+   SAVE FINAL PHOTO
+========================= */
+
+function saveImage() {
+
+  if(!solved || !photo) {
+    toast("أكملي البازل أولاً");
+    return;
+  }
+
+  const img = new Image();
+
+  img.onload = ()=> {
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 900;
+    canvas.height = 900;
+
+    const ctx = canvas.getContext("2d");
+
+    ctx.drawImage(img,0,0,900,900);
+
+    canvas.toBlob(blob=> {
+
+      if(!blob) {
+        toast("تعذر تجهيز الصورة");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = "EMAN-PUZZLE.png";
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+
+      toast("تم حفظ الصورة");
+
+    },"image/png");
+  };
+
+  img.onerror = ()=> {
+    toast("تعذر تحميل الصورة");
+  };
+
+  img.src = photo;
+}
+
+/* =========================
+   RESET
+========================= */
+
+function resetGame() {
+
+  if(dragged) {
+    dragged.el.classList.remove("drag");
+    dragged = null;
+  }
+
+  piecesLayer.innerHTML = "";
+
+  pieces = [];
+  photo = null;
+  solved = false;
+  pinching = false;
+
+  saveBtn.disabled = true;
+
+  progress.textContent = "0 / 9";
+
+  board.classList.remove("done");
+
+  countEl.style.display = "none";
+
+  say("اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋");
+}
+
+/* =========================
+   CAMERA & MEDIAPIPE
+========================= */
+
+async function initializeCamera() {
+
+  try {
+
+    if(!navigator.mediaDevices ||
+       !navigator.mediaDevices.getUserMedia) {
+
+      throw new Error(
+        "يجب فتح الصفحة عبر HTTPS أو localhost لتشغيل الكاميرا"
+      );
+    }
+
+    if(typeof Hands === "undefined") {
+      throw new Error(
+        "تعذر تحميل مكتبة تتبع اليد. تحققي من الإنترنت."
+      );
+    }
+
+    hands = new Hands({
+      locateFile: file =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands:1,
+      modelComplexity:0,
+      minDetectionConfidence:0.62,
+      minTrackingConfidence:0.58
+    });
+
+    hands.onResults(onHandResults);
+
+    stream = await navigator.mediaDevices.getUserMedia({
+
+      video:{
+        facingMode:"user",
+        width:{ideal:640},
+        height:{ideal:480},
+        frameRate:{ideal:24,max:30}
+      },
+
+      audio:false
+    });
+
+    video.srcObject = stream;
+
+    await new Promise((resolve,reject)=> {
+
+      if(video.readyState >= 2) {
+        resolve();
+        return;
+      }
+
+      video.onloadedmetadata = ()=>resolve();
+
+      video.onerror = ()=>reject(
+        new Error("تعذر تشغيل الفيديو")
+      );
+
+    });
+
+    await video.play();
+
+    ready = true;
+
+    status.textContent =
+      "الكاميرا جاهزة · ارفعي يدك للتحكم";
+
+    say("اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋");
+
+    // Process only one frame at a time
+    async function processFrame(now) {
+
+      if(!ready) return;
+
+      if(
+        !processing &&
+        now-lastSend > 65 &&
+        video.readyState >= 2
+      ) {
+
+        processing = true;
+
+        lastSend = now;
+
+        try {
+
+          await hands.send({
+            image:video
+          });
+
+        } catch(error) {
+
+          console.warn("Hand tracking:",error);
+
+        } finally {
+
+          processing = false;
+        }
+      }
+
+      rafId = requestAnimationFrame(processFrame);
+    }
+
+    rafId = requestAnimationFrame(processFrame);
+
+  } catch(error) {
+
+    console.error(error);
+
+    ready = false;
+
+    status.textContent = "تعذر تشغيل الكاميرا";
+
+    say(error.message || "تحققي من إذن الكاميرا");
+
+    toast("تحققي من إذن الكاميرا والإنترنت");
+  }
+}
+
+/* =========================
+   EVENTS
+========================= */
+
+startBtn.addEventListener(
+  "click",
+  startCountdown
+);
+
+saveBtn.addEventListener(
+  "click",
+  saveImage
+);
+
+$("reset").addEventListener(
+  "click",
+  resetGame
+);
+
+/* =========================
+   CLEANUP
+========================= */
+
+window.addEventListener("pagehide",()=> {
+
+  ready = false;
+
+  if(rafId) {
+    cancelAnimationFrame(rafId);
+  }
+
+  if(stream) {
+    stream.getTracks().forEach(
+      track=>track.stop()
+    );
+  }
+
+  if(hands && hands.close) {
+    hands.close();
   }
 });
 
-const cam=new Camera(video,{onFrame:async()=>{ await hands.send({image:video}); },width:640,height:480});
-cam.start();
+/* =========================
+   START
+========================= */
 
-// ابدأ لوحده بعد ثانيتين
-setTimeout(()=>startGame(null), 800);
+initializeCamera();
+
+})();
 </script>
+
 </body>
-  </html>
+</html>
