@@ -3,302 +3,331 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>PUZZLE CAM - EMAN</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PUZZLE CAM</title>
 
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: system-ui, sans-serif;
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+ --green:#00ff91;
+ --green2:#00c875;
+ --gold:#ffd700;
+ --black:#020907;
 }
 
-:root {
-  --gold: #ffd700;
-  --green: #00ff99;
-  --glass: rgba(0,0,0,.72);
+html,body{
+ width:100%;
+ height:100%;
+ overflow:hidden;
+ background:var(--black);
+ color:white;
+ font-family:system-ui,sans-serif;
+ touch-action:none;
 }
 
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #000;
-  color: white;
-  touch-action: none;
+#video{
+ position:fixed;
+ inset:0;
+ width:100%;
+ height:100%;
+ object-fit:cover;
+ transform:scaleX(-1);
+ filter:grayscale(1) sepia(1) hue-rotate(75deg)
+ saturate(3) brightness(.72) contrast(1.25);
 }
 
-#video {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-  filter: brightness(.85);
+#fx{
+ position:fixed;
+ inset:0;
+ width:100%;
+ height:100%;
+ pointer-events:none;
+ z-index:5;
 }
 
-#shade {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(0,0,0,.5),
-    transparent 30%,
-    transparent 70%,
-    rgba(0,0,0,.6)
-  );
+#scanlines{
+ position:fixed;
+ inset:0;
+ pointer-events:none;
+ z-index:6;
+ opacity:.18;
+ background:repeating-linear-gradient(
+  0deg,
+  transparent 0px,
+  transparent 3px,
+  #00ff91 4px,
+  transparent 5px
+ );
 }
 
-#top {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  display: flex;
-  justify-content: space-between;
-  z-index: 30;
-  direction: ltr;
+#vignette{
+ position:fixed;
+ inset:0;
+ pointer-events:none;
+ z-index:7;
+ background:radial-gradient(
+  ellipse at center,
+  transparent 35%,
+  #001c10aa 100%
+ );
 }
 
-.pill {
-  background: var(--glass);
-  border: 1px solid #ffffff30;
-  padding: 9px 13px;
-  border-radius: 25px;
-  font-size: 12px;
-  font-weight: 900;
-  backdrop-filter: blur(10px);
+#header{
+ position:fixed;
+ top:15px;
+ left:14px;
+ right:14px;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ z-index:30;
+ direction:ltr;
 }
 
-#brand {
-  color: var(--gold);
-  letter-spacing: 1px;
+.hud{
+ padding:9px 13px;
+ border:1px solid #00ff9166;
+ background:#001b12aa;
+ color:var(--green);
+ font-size:11px;
+ font-weight:900;
+ letter-spacing:1px;
+ border-radius:5px;
+ backdrop-filter:blur(8px);
+ box-shadow:0 0 12px #00ff9122;
 }
 
-#progress {
-  color: white;
+#faceStatus{
+ position:fixed;
+ top:70px;
+ left:50%;
+ transform:translateX(-50%);
+ z-index:30;
+ color:var(--green);
+ font-size:11px;
+ letter-spacing:2px;
+ font-weight:900;
+ text-shadow:0 0 12px var(--green);
+ white-space:nowrap;
 }
 
-#board {
-  position: absolute;
-  width: min(78vw, 390px, 52vh);
-  height: min(78vw, 390px, 52vh);
-  left: 50%;
-  top: 47%;
-  transform: translate(-50%, -50%);
-  border: 3px solid var(--gold);
-  box-shadow: 0 0 25px #ffd70066;
-  z-index: 5;
-  pointer-events: none;
-  transition: .3s;
+#faceStatus.detected{
+ animation:blink 1.2s infinite;
 }
 
-#board::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg,
-      transparent 33%,
-      #ffffff55 33.3%,
-      transparent 33.6%,
-      transparent 66.4%,
-      #ffffff55 66.7%,
-      transparent 67%
-    ),
-    linear-gradient(0deg,
-      transparent 33%,
-      #ffffff55 33.3%,
-      transparent 33.6%,
-      transparent 66.4%,
-      #ffffff55 66.7%,
-      transparent 67%
-    );
+@keyframes blink{
+ 50%{opacity:.45}
 }
 
-#board.done {
-  border-color: var(--green);
-  box-shadow: 0 0 35px #00ff9988;
+#board{
+ position:fixed;
+ left:50%;
+ top:47%;
+ transform:translate(-50%,-50%);
+ width:min(78vw,390px,52vh);
+ height:min(78vw,390px,52vh);
+ border:2px solid var(--gold);
+ box-shadow:0 0 25px #ffd70055;
+ z-index:12;
+ display:none;
+ pointer-events:none;
 }
 
-#pieces {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  pointer-events: none;
+#board.visible{
+ display:block;
 }
 
-.piece {
-  position: absolute;
-  background-repeat: no-repeat;
-  border: 1px solid #ffffffaa;
-  box-shadow: 0 5px 15px #0009;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
+#board.done{
+ border-color:var(--green);
+ box-shadow:0 0 30px #00ff9188;
 }
 
-.piece.drag {
-  z-index: 100 !important;
-  border: 3px solid var(--gold);
-  box-shadow: 0 0 22px #ffd700aa;
-  transform: scale(1.04);
+#pieces{
+ position:fixed;
+ inset:0;
+ z-index:15;
+ pointer-events:none;
 }
 
-.piece.correct {
-  border: 2px solid var(--green);
-  box-shadow: 0 0 13px #00ff9988;
+.piece{
+ position:absolute;
+ background-repeat:no-repeat;
+ border:1px solid #ffffffaa;
+ box-shadow:0 4px 15px #0009;
+ pointer-events:auto;
+ touch-action:none;
+ user-select:none;
+ -webkit-user-select:none;
 }
 
-#handDot {
-  position: fixed;
-  width: 20px;
-  height: 20px;
-  border: 3px solid white;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 18px var(--gold);
-  z-index: 110;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  display: none;
+.piece.drag{
+ z-index:100!important;
+ border:2px solid var(--gold);
+ box-shadow:0 0 22px #ffd700aa;
+ transform:scale(1.04);
 }
 
-#handDot.pinching {
-  width: 30px;
-  height: 30px;
-  background: var(--green);
-  box-shadow: 0 0 20px var(--green);
+.piece.correct{
+ border:2px solid var(--green);
+ box-shadow:0 0 12px #00ff9188;
 }
 
-#message {
-  position: fixed;
-  left: 50%;
-  top: calc(47% + min(39vw,195px,26vh) + 15px);
-  transform: translateX(-50%);
-  background: var(--glass);
-  border: 1px solid #ffffff30;
-  border-radius: 20px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 900;
-  text-align: center;
-  white-space: nowrap;
-  z-index: 30;
-  max-width: 94vw;
+#handDot{
+ position:fixed;
+ width:20px;
+ height:20px;
+ border:2px solid white;
+ border-radius:50%;
+ background:var(--green);
+ box-shadow:0 0 18px var(--green);
+ transform:translate(-50%,-50%);
+ pointer-events:none;
+ display:none;
+ z-index:110;
 }
 
-#count {
-  position: fixed;
-  inset: 0;
-  display: none;
-  place-items: center;
-  font-size: 120px;
-  font-weight: 1000;
-  color: var(--gold);
-  text-shadow: 0 0 30px black, 0 0 30px var(--gold);
-  z-index: 150;
+#handDot.pinching{
+ width:30px;
+ height:30px;
+ background:var(--gold);
+ box-shadow:0 0 20px var(--gold);
 }
 
-#status {
-  position: fixed;
-  bottom: 78px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #0009;
-  padding: 7px 12px;
-  border-radius: 20px;
-  font-size: 11px;
-  z-index: 30;
-  white-space: nowrap;
+#message{
+ position:fixed;
+ bottom:105px;
+ left:50%;
+ transform:translateX(-50%);
+ padding:11px 16px;
+ background:#001b12dd;
+ border:1px solid #00ff9166;
+ color:var(--green);
+ font-size:12px;
+ font-weight:900;
+ text-align:center;
+ border-radius:5px;
+ z-index:35;
+ max-width:94vw;
+ white-space:nowrap;
 }
 
-#controls {
-  position: fixed;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  left: 10px;
-  right: 10px;
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  z-index: 120;
+#count{
+ position:fixed;
+ inset:0;
+ display:none;
+ place-items:center;
+ font-size:120px;
+ font-weight:1000;
+ color:var(--green);
+ text-shadow:0 0 30px var(--green);
+ z-index:150;
 }
 
-button {
-  border: none;
-  border-radius: 25px;
-  padding: 12px 17px;
-  font-weight: 900;
-  font-size: 13px;
-  color: #111;
-  background: white;
-  box-shadow: 0 5px 15px #0007;
+#controls{
+ position:fixed;
+ bottom:max(15px,env(safe-area-inset-bottom));
+ left:0;
+ right:0;
+ display:flex;
+ justify-content:center;
+ gap:9px;
+ flex-wrap:wrap;
+ padding:0 8px;
+ z-index:130;
 }
 
-button.primary {
-  background: var(--gold);
+button{
+ border:1px solid #00ff9188;
+ background:#001c12ee;
+ color:var(--green);
+ padding:12px 17px;
+ border-radius:5px;
+ font-size:12px;
+ font-weight:900;
+ box-shadow:0 0 12px #00ff9122;
 }
 
-button:disabled {
-  opacity: .4;
+button.primary{
+ background:#00c875;
+ color:#00150d;
+ border-color:var(--green);
 }
 
-#toast {
-  position: fixed;
-  top: 18%;
-  left: 50%;
-  transform: translate(-50%, -10px);
-  padding: 12px 18px;
-  border: 1px solid var(--green);
-  background: #071b14;
-  color: var(--green);
-  border-radius: 15px;
-  font-weight: 900;
-  opacity: 0;
-  transition: .25s;
-  z-index: 200;
-  pointer-events: none;
+button:disabled{
+ opacity:.35;
 }
 
-#toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
+#toast{
+ position:fixed;
+ top:20%;
+ left:50%;
+ transform:translate(-50%,-10px);
+ background:#001b12;
+ border:1px solid var(--green);
+ color:var(--green);
+ padding:12px 18px;
+ z-index:200;
+ opacity:0;
+ transition:.25s;
+ font-weight:900;
+ border-radius:5px;
+ text-align:center;
+ max-width:90vw;
 }
 
-.confetti {
-  position: fixed;
-  width: 9px;
-  height: 9px;
-  z-index: 180;
-  pointer-events: none;
-  border-radius: 2px;
+#toast.show{
+ opacity:1;
+ transform:translate(-50%,0);
 }
 
-@media(max-height:620px) {
-  #board {
-    top: 43%;
-    width: min(65vw, 46vh);
-    height: min(65vw, 46vh);
-  }
+#loading{
+ position:fixed;
+ inset:0;
+ z-index:300;
+ background:#020907;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ flex-direction:column;
+ gap:15px;
+}
 
-  #message {
-    top: calc(43% + min(32.5vw,23vh) + 10px);
-  }
+#loading.hide{
+ display:none;
+}
 
-  #status {
-    bottom: 65px;
-  }
+.loader{
+ width:45px;
+ height:45px;
+ border:3px solid #16412c;
+ border-top-color:var(--green);
+ border-radius:50%;
+ animation:spin .8s linear infinite;
+}
 
-  button {
-    padding: 9px 13px;
-  }
+@keyframes spin{
+ to{transform:rotate(360deg)}
+}
+
+#loadText{
+ color:var(--green);
+ font-size:12px;
+ letter-spacing:2px;
+ font-weight:900;
+}
+
+@media(max-height:620px){
+ #board{
+  top:43%;
+  width:min(65vw,46vh);
+  height:min(65vw,46vh);
+ }
+ #message{bottom:80px}
+ button{padding:9px 13px}
 }
 </style>
 </head>
@@ -306,29 +335,39 @@ button:disabled {
 <body>
 
 <video id="video" autoplay muted playsinline></video>
-<div id="shade"></div>
 
-<div id="top">
-  <div class="pill" id="brand">PUZZLE CAM · EMAN</div>
-  <div class="pill" id="progress">0 / 9</div>
+<canvas id="fx"></canvas>
+
+<div id="scanlines"></div>
+<div id="vignette"></div>
+
+<div id="loading">
+ <div class="loader"></div>
+ <div id="loadText">INITIALIZING CAMERA...</div>
 </div>
+
+<div id="header">
+ <div class="hud">PUZZLE CAM</div>
+ <div class="hud" id="progress">0 / 9</div>
+</div>
+
+<div id="faceStatus">SCANNING FACE...</div>
 
 <div id="board"></div>
 <div id="pieces"></div>
 <div id="handDot"></div>
 
 <div id="message">
-  اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋
+ انظري إلى الكاميرا لبدء اكتشاف الوجه
 </div>
 
 <div id="count">3</div>
-<div id="status">جارٍ تجهيز الكاميرا...</div>
 <div id="toast"></div>
 
 <div id="controls">
-  <button class="primary" id="start">📸 ابدأ التصوير</button>
-  <button id="save" disabled>⬇ حفظ الصورة</button>
-  <button id="reset">↻ إعادة</button>
+ <button class="primary" id="start">📸 CAPTURE</button>
+ <button id="save" disabled>⬇ SAVE</button>
+ <button id="reset">↻ RESET</button>
 </div>
 
 <script>
@@ -341,881 +380,1025 @@ button:disabled {
 const $ = id => document.getElementById(id);
 
 const video = $("video");
+const fx = $("fx");
+const ctx = fx.getContext("2d");
+
 const board = $("board");
 const piecesLayer = $("pieces");
 const dot = $("handDot");
 const message = $("message");
+const faceStatus = $("faceStatus");
 const progress = $("progress");
-const status = $("status");
+const loading = $("loading");
 const countEl = $("count");
-const startBtn = $("start");
 const saveBtn = $("save");
 
 const GRID = 3;
-const TOTAL = GRID * GRID;
+const TOTAL = 9;
 
 /* =========================
    STATE
 ========================= */
 
-let hands = null;
 let stream = null;
+let faceDetector = null;
+let handDetector = null;
 
-let photo = null;
-let pieces = [];
+let faceBox = null;
+let lastFaceTime = 0;
 
 let ready = false;
+let photo = null;
+let pieces = [];
 let solved = false;
-let countdownRunning = false;
+let counting = false;
 
-let pinching = false;
-let dragged = null;
-
-let dragOffset = {x:0,y:0};
-
-let pointerDragId = null;
-let handEnabled = true;
-
-let lastSend = 0;
 let processing = false;
-let rafId = null;
+let lastFrame = 0;
+let lastHandTime = 0;
+
+let pinch = false;
+let dragged = null;
+let offset = {x:0,y:0};
+
+let pointerId = null;
+let handControl = true;
+
+let animationId = null;
 let toastTimer = null;
 
 /* =========================
    HELPERS
 ========================= */
 
-function say(text) {
-  message.textContent = text;
+function say(t){
+ message.textContent = t;
 }
 
-function toast(text) {
-  const el = $("toast");
+function toast(t){
+ const el = $("toast");
 
-  el.textContent = text;
-  el.classList.add("show");
+ el.textContent = t;
+ el.classList.add("show");
 
-  clearTimeout(toastTimer);
+ clearTimeout(toastTimer);
 
-  toastTimer = setTimeout(() => {
-    el.classList.remove("show");
-  }, 2000);
+ toastTimer = setTimeout(()=>{
+  el.classList.remove("show");
+ },2200);
 }
 
-function boardRect() {
-  return board.getBoundingClientRect();
+function resizeCanvas(){
+ fx.width = innerWidth;
+ fx.height = innerHeight;
 }
 
-function dimensions() {
-  const r = boardRect();
+window.addEventListener("resize",resizeCanvas);
+resizeCanvas();
 
-  return {
-    width: r.width,
-    height: r.height,
-    pw: r.width / GRID,
-    ph: r.height / GRID
-  };
-}
+/* =========================
+   FACE HUD
+========================= */
 
-function targetPosition(piece) {
-  const r = boardRect();
-  const d = dimensions();
+function drawFaceHUD(){
 
-  return {
-    x: r.left + (piece.correct % GRID) * d.pw,
-    y: r.top + Math.floor(piece.correct / GRID) * d.ph
-  };
-}
+ ctx.clearRect(0,0,fx.width,fx.height);
 
-function closeEnough(a,b,distance) {
-  return (
-    Math.abs(a.x-b.x) < distance &&
-    Math.abs(a.y-b.y) < distance
-  );
+ if(!faceBox || Date.now()-lastFaceTime>900){
+
+  faceStatus.textContent = "SCANNING FACE...";
+  faceStatus.classList.remove("detected");
+
+  return;
+ }
+
+ const W = fx.width;
+ const H = fx.height;
+
+ const x = (1-faceBox.centerX-faceBox.width/2)*W;
+ const y = (faceBox.centerY-faceBox.height/2)*H;
+ const w = faceBox.width*W;
+ const h = faceBox.height*H;
+
+ const color = "#00ff91";
+
+ ctx.save();
+
+ ctx.strokeStyle = color;
+ ctx.fillStyle = color;
+ ctx.lineWidth = 2;
+
+ ctx.shadowColor = color;
+ ctx.shadowBlur = 12;
+
+ // Dynamic face frame - no fixed square
+ const corner = Math.min(w,h)*.19;
+
+ function corners(){
+
+  ctx.beginPath();
+
+  // Top left
+  ctx.moveTo(x,y+corner);
+  ctx.lineTo(x,y);
+  ctx.lineTo(x+corner,y);
+
+  // Top right
+  ctx.moveTo(x+w-corner,y);
+  ctx.lineTo(x+w,y);
+  ctx.lineTo(x+w,y+corner);
+
+  // Bottom left
+  ctx.moveTo(x,y+h-corner);
+  ctx.lineTo(x,y+h);
+  ctx.lineTo(x+corner,y+h);
+
+  // Bottom right
+  ctx.moveTo(x+w-corner,y+h);
+  ctx.lineTo(x+w,y+h);
+  ctx.lineTo(x+w,y+h-corner);
+
+  ctx.stroke();
+ }
+
+ corners();
+
+ // Face grid
+ ctx.globalAlpha=.35;
+ ctx.lineWidth=.7;
+
+ ctx.beginPath();
+ ctx.moveTo(x+w/2,y);
+ ctx.lineTo(x+w/2,y+h);
+
+ ctx.moveTo(x,y+h/2);
+ ctx.lineTo(x+w,y+h/2);
+
+ ctx.stroke();
+
+ ctx.globalAlpha=1;
+
+ // Moving scan line
+ const scanY = y + ((Date.now()%1800)/1800)*h;
+
+ ctx.globalAlpha=.8;
+ ctx.lineWidth=1.5;
+
+ ctx.beginPath();
+ ctx.moveTo(x,scanY);
+ ctx.lineTo(x+w,scanY);
+ ctx.stroke();
+
+ ctx.globalAlpha=1;
+
+ ctx.font="bold 11px monospace";
+ ctx.fillText("FACE DETECTED",x,y-10);
+
+ ctx.font="9px monospace";
+ ctx.fillText("TRACKING: ACTIVE",x,y+h+15);
+
+ // Small targeting points
+ for(let i=0;i<4;i++){
+
+  const px = x+(i%2)*w;
+  const py = y+Math.floor(i/2)*h;
+
+  ctx.beginPath();
+  ctx.arc(px,py,3,0,Math.PI*2);
+  ctx.fill();
+ }
+
+ ctx.restore();
+
+ faceStatus.textContent = "● FACE DETECTED";
+ faceStatus.classList.add("detected");
 }
 
 /* =========================
-   CAMERA PHOTO
+   CAMERA FRAME LOOP
 ========================= */
 
-function capturePhoto() {
+function renderLoop(){
 
-  const w = video.videoWidth;
-  const h = video.videoHeight;
+ drawFaceHUD();
 
-  if (!w || !h) {
-    throw new Error("الكاميرا لم تصبح جاهزة بعد");
+ animationId = requestAnimationFrame(renderLoop);
+}
+
+/* =========================
+   FACE RESULTS
+========================= */
+
+function onFaceResults(results){
+
+ const detection = results.detections?.[0];
+
+ if(!detection){
+
+  faceBox = null;
+
+  if(!photo){
+   faceStatus.textContent = "SCANNING FACE...";
   }
 
-  const canvas = document.createElement("canvas");
+  return;
+ }
 
-  canvas.width = 600;
-  canvas.height = 600;
+ const b = detection.boundingBox;
 
-  const ctx = canvas.getContext("2d", {
-    willReadFrequently: true
-  });
+ faceBox = {
+  centerX:b.xCenter,
+  centerY:b.yCenter,
+  width:b.width,
+  height:b.height
+ };
 
-  const size = Math.min(w,h);
+ lastFaceTime = Date.now();
+}
 
-  const sx = (w-size)/2;
-  const sy = (h-size)/2;
+/* =========================
+   PHOTO CAPTURE
+========================= */
 
-  ctx.save();
+function capturePhoto(){
 
-  ctx.translate(600,0);
-  ctx.scale(-1,1);
+ if(!video.videoWidth || !video.videoHeight){
+  throw new Error("الكاميرا غير جاهزة");
+ }
 
-  ctx.drawImage(
-    video,
-    sx,sy,size,size,
-    0,0,600,600
-  );
+ const W = video.videoWidth;
+ const H = video.videoHeight;
 
-  ctx.restore();
+ const c = document.createElement("canvas");
+ c.width = 600;
+ c.height = 600;
 
-  // Grayscale filter
-  const image = ctx.getImageData(0,0,600,600);
-  const data = image.data;
+ const g = c.getContext("2d",{
+  willReadFrequently:true
+ });
 
-  for(let i=0; i<data.length; i+=4) {
+ let sx,sy,size;
 
-    const gray =
-      0.299 * data[i] +
-      0.587 * data[i+1] +
-      0.114 * data[i+2];
+ // Crop around detected face
+ if(faceBox){
 
-    data[i] = gray;
-    data[i+1] = gray;
-    data[i+2] = gray;
-  }
+  const cx = (1-faceBox.centerX)*W;
+  const cy = faceBox.centerY*H;
 
-  ctx.putImageData(image,0,0);
+  size = Math.max(
+   faceBox.width*W,
+   faceBox.height*H
+  )*1.65;
 
-  return canvas.toDataURL("image/jpeg",0.88);
+  size = Math.min(size,W,H);
+
+  sx = Math.max(0,Math.min(W-size,cx-size/2));
+  sy = Math.max(0,Math.min(H-size,cy-size/2));
+
+ }else{
+
+  size = Math.min(W,H);
+  sx = (W-size)/2;
+  sy = (H-size)/2;
+ }
+
+ // Mirror the captured photo
+ g.save();
+
+ g.translate(600,0);
+ g.scale(-1,1);
+
+ g.drawImage(
+  video,
+  sx,sy,size,size,
+  0,0,600,600
+ );
+
+ g.restore();
+
+ // Black and white
+ const img = g.getImageData(0,0,600,600);
+ const d = img.data;
+
+ for(let i=0;i<d.length;i+=4){
+
+  const gray =
+   .299*d[i]+
+   .587*d[i+1]+
+   .114*d[i+2];
+
+  d[i]=gray;
+  d[i+1]=gray;
+  d[i+2]=gray;
+ }
+
+ g.putImageData(img,0,0);
+
+ return c.toDataURL("image/jpeg",.9);
 }
 
 /* =========================
    COUNTDOWN
 ========================= */
 
-function startCountdown() {
+function startCapture(){
 
-  if (!ready) {
-    toast("انتظري حتى تعمل الكاميرا");
-    return;
+ if(!ready){
+  toast("الكاميرا لم تعمل بعد");
+  return;
+ }
+
+ if(counting) return;
+
+ if(!faceBox || Date.now()-lastFaceTime>900){
+  toast("ضعي وجهك أمام الكاميرا أولاً");
+  return;
+ }
+
+ counting = true;
+
+ let n=3;
+
+ countEl.style.display="grid";
+ countEl.textContent=n;
+
+ say("جاري التقاط الوجه...");
+
+ const timer = setInterval(()=>{
+
+  n--;
+
+  if(n>0){
+
+   countEl.textContent=n;
+
+  }else{
+
+   clearInterval(timer);
+
+   countEl.style.display="none";
+   counting=false;
+
+   try{
+
+    photo=capturePhoto();
+
+    faceBox=null;
+
+    board.classList.add("visible");
+
+    buildPuzzle();
+
+    say("اسحبي القطع إلى أماكنها الصحيحة");
+
+    faceStatus.textContent="PUZZLE MODE";
+
+   }catch(e){
+
+    toast(e.message);
+    say(e.message);
+   }
   }
 
-  if (countdownRunning) return;
-
-  countdownRunning = true;
-
-  piecesLayer.innerHTML = "";
-  pieces = [];
-
-  photo = null;
-  solved = false;
-
-  saveBtn.disabled = true;
-
-  board.classList.remove("done");
-
-  let number = 3;
-
-  countEl.style.display = "grid";
-  countEl.textContent = number;
-
-  say("استعدي للتصوير...");
-
-  const timer = setInterval(() => {
-
-    number--;
-
-    if (number > 0) {
-
-      countEl.textContent = number;
-      say("استعدي... " + number);
-
-    } else {
-
-      clearInterval(timer);
-
-      countEl.style.display = "none";
-      countdownRunning = false;
-
-      try {
-
-        photo = capturePhoto();
-
-        buildPuzzle();
-
-        say("المسي الإبهام بالسبابة واسحبي القطع");
-
-      } catch(error) {
-
-        say(error.message);
-        toast(error.message);
-      }
-    }
-
-  },850);
+ },850);
 }
 
 /* =========================
    BUILD PUZZLE
 ========================= */
 
-function buildPuzzle() {
+function dimensions(){
 
-  piecesLayer.innerHTML = "";
-  pieces = [];
+ const r=board.getBoundingClientRect();
 
-  const r = boardRect();
-  const d = dimensions();
-
-  let order = Array.from(
-    {length:TOTAL},
-    (_,i)=>i
-  );
-
-  // Shuffle
-  do {
-
-    for(let i=order.length-1; i>0; i--) {
-
-      const j = Math.floor(Math.random()*(i+1));
-
-      [order[i],order[j]] =
-      [order[j],order[i]];
-    }
-
-  } while(order.every((v,i)=>v===i));
-
-  order.forEach((correct,slot) => {
-
-    const col = slot % GRID;
-    const row = Math.floor(slot / GRID);
-
-    const el = document.createElement("div");
-
-    el.className = "piece";
-
-    el.style.width = d.pw + "px";
-    el.style.height = d.ph + "px";
-
-    el.style.left =
-      (r.left + col*d.pw) + "px";
-
-    el.style.top =
-      (r.top + row*d.ph) + "px";
-
-    el.style.backgroundImage =
-      `url("${photo}")`;
-
-    el.style.backgroundSize =
-      `${r.width}px ${r.height}px`;
-
-    const correctCol = correct % GRID;
-    const correctRow = Math.floor(correct/GRID);
-
-    el.style.backgroundPosition =
-      `${-correctCol*d.pw}px ${-correctRow*d.ph}px`;
-
-    const piece = {
-      el,
-      correct,
-      x:r.left + col*d.pw,
-      y:r.top + row*d.ph,
-      w:d.pw,
-      h:d.ph
-    };
-
-    // Touch and mouse control
-    el.addEventListener(
-      "pointerdown",
-      e => pointerStart(e,piece)
-    );
-
-    piecesLayer.appendChild(el);
-
-    pieces.push(piece);
-  });
-
-  updateProgress();
+ return {
+  rect:r,
+  pw:r.width/GRID,
+  ph:r.height/GRID
+ };
 }
 
-/* =========================
-   DRAG ENGINE
-========================= */
+function buildPuzzle(){
 
-function placePiece(piece,x,y) {
+ piecesLayer.innerHTML="";
+ pieces=[];
 
-  piece.x = x;
-  piece.y = y;
+ const d=dimensions();
 
-  piece.el.style.left = x + "px";
-  piece.el.style.top = y + "px";
-}
+ let order=Array.from({length:TOTAL},(_,i)=>i);
 
-function snapPiece(piece) {
+ // Shuffle
+ do{
 
-  const target = targetPosition(piece);
+  for(let i=order.length-1;i>0;i--){
 
-  const distance = Math.min(34,piece.w*0.22);
+   const j=Math.floor(Math.random()*(i+1));
 
-  if(closeEnough(piece,target,distance)) {
-
-    placePiece(piece,target.x,target.y);
-
-    piece.el.classList.add("correct");
-
-    return true;
+   [order[i],order[j]]=[order[j],order[i]];
   }
 
-  piece.el.classList.remove("correct");
+ }while(order.every((v,i)=>v===i));
 
-  return false;
-}
+ order.forEach((correct,slot)=>{
 
-function beginDrag(piece,x,y) {
+  const col=slot%GRID;
+  const row=Math.floor(slot/GRID);
 
-  if(!piece || piece.el.classList.contains("correct")) {
-    return;
-  }
+  const el=document.createElement("div");
 
-  if(dragged && dragged !== piece) {
-    return;
-  }
+  el.className="piece";
 
-  dragged = piece;
+  el.style.width=d.pw+"px";
+  el.style.height=d.ph+"px";
 
-  const rect = piece.el.getBoundingClientRect();
+  el.style.left=(d.rect.left+col*d.pw)+"px";
+  el.style.top=(d.rect.top+row*d.ph)+"px";
 
-  dragOffset = {
-    x:x-rect.left,
-    y:y-rect.top
+  el.style.backgroundImage=`url("${photo}")`;
+  el.style.backgroundSize=
+   `${d.rect.width}px ${d.rect.height}px`;
+
+  const cc=correct%GRID;
+  const cr=Math.floor(correct/GRID);
+
+  el.style.backgroundPosition=
+   `${-cc*d.pw}px ${-cr*d.ph}px`;
+
+  const p={
+   el,
+   correct,
+   x:d.rect.left+col*d.pw,
+   y:d.rect.top+row*d.ph,
+   w:d.pw
   };
 
-  piece.el.classList.add("drag");
-}
-
-function moveDrag(x,y) {
-
-  if(!dragged) return;
-
-  placePiece(
-    dragged,
-    x-dragOffset.x,
-    y-dragOffset.y
+  el.addEventListener(
+   "pointerdown",
+   e=>pointerStart(e,p)
   );
-}
 
-function endDrag() {
+  piecesLayer.appendChild(el);
+  pieces.push(p);
+ });
 
-  if(!dragged) return;
-
-  const piece = dragged;
-
-  piece.el.classList.remove("drag");
-
-  snapPiece(piece);
-
-  dragged = null;
-
-  updateProgress();
-}
-
-function findPiece(x,y) {
-
-  for(let i=pieces.length-1;i>=0;i--) {
-
-    const p = pieces[i];
-
-    if(p.el.classList.contains("correct")) {
-      continue;
-    }
-
-    const r = p.el.getBoundingClientRect();
-
-    if(
-      x>=r.left &&
-      x<=r.right &&
-      y>=r.top &&
-      y<=r.bottom
-    ) {
-      return p;
-    }
-  }
-
-  return null;
+ updateProgress();
 }
 
 /* =========================
-   POINTER CONTROL
+   DRAG SYSTEM
 ========================= */
 
-function pointerStart(e,piece) {
+function target(p){
 
-  if(!photo || dragged || pointerDragId !== null) {
-    return;
-  }
+ const d=dimensions();
 
-  if(piece.el.classList.contains("correct")) {
-    return;
-  }
-
-  e.preventDefault();
-
-  pointerDragId = e.pointerId;
-
-  handEnabled = false;
-
-  beginDrag(piece,e.clientX,e.clientY);
-
-  try {
-    piece.el.setPointerCapture(e.pointerId);
-  } catch(e) {}
+ return {
+  x:d.rect.left+(p.correct%GRID)*d.pw,
+  y:d.rect.top+Math.floor(p.correct/GRID)*d.ph
+ };
 }
 
-window.addEventListener("pointermove",e=> {
+function near(a,b,t){
 
-  if(pointerDragId !== e.pointerId) return;
+ return Math.abs(a.x-b.x)<t &&
+        Math.abs(a.y-b.y)<t;
+}
 
-  moveDrag(e.clientX,e.clientY);
+function place(p,x,y){
+
+ p.x=x;
+ p.y=y;
+
+ p.el.style.left=x+"px";
+ p.el.style.top=y+"px";
+}
+
+function snap(p){
+
+ const t=target(p);
+
+ if(near(p,t,Math.min(32,p.w*.22))){
+
+  place(p,t.x,t.y);
+  p.el.classList.add("correct");
+
+  return true;
+ }
+
+ p.el.classList.remove("correct");
+
+ return false;
+}
+
+function beginDrag(p,x,y){
+
+ if(!p || dragged ||
+    p.el.classList.contains("correct")) return;
+
+ dragged=p;
+
+ const r=p.el.getBoundingClientRect();
+
+ offset={
+  x:x-r.left,
+  y:y-r.top
+ };
+
+ p.el.classList.add("drag");
+}
+
+function moveDrag(x,y){
+
+ if(!dragged) return;
+
+ place(
+  dragged,
+  x-offset.x,
+  y-offset.y
+ );
+}
+
+function endDrag(){
+
+ if(!dragged) return;
+
+ const p=dragged;
+
+ p.el.classList.remove("drag");
+
+ snap(p);
+
+ dragged=null;
+
+ updateProgress();
+}
+
+function findPiece(x,y){
+
+ for(let i=pieces.length-1;i>=0;i--){
+
+  const p=pieces[i];
+
+  if(p.el.classList.contains("correct")) continue;
+
+  const r=p.el.getBoundingClientRect();
+
+  if(
+   x>=r.left && x<=r.right &&
+   y>=r.top && y<=r.bottom
+  ){
+   return p;
+  }
+ }
+
+ return null;
+}
+
+/* =========================
+   TOUCH / MOUSE
+========================= */
+
+function pointerStart(e,p){
+
+ if(!photo || dragged || pointerId!==null) return;
+
+ if(p.el.classList.contains("correct")) return;
+
+ e.preventDefault();
+
+ pointerId=e.pointerId;
+ handControl=false;
+
+ beginDrag(p,e.clientX,e.clientY);
+
+ try{
+  p.el.setPointerCapture(e.pointerId);
+ }catch(err){}
+}
+
+window.addEventListener("pointermove",e=>{
+
+ if(pointerId!==e.pointerId) return;
+
+ moveDrag(e.clientX,e.clientY);
 
 });
 
-function finishPointer(e) {
+function pointerFinish(e){
 
-  if(pointerDragId !== e.pointerId) return;
+ if(pointerId!==e.pointerId) return;
 
-  pointerDragId = null;
+ pointerId=null;
 
+ endDrag();
+
+ handControl=true;
+}
+
+window.addEventListener("pointerup",pointerFinish);
+window.addEventListener("pointercancel",pointerFinish);
+
+/* =========================
+   HAND RESULTS
+========================= */
+
+function onHandResults(results){
+
+ const lm=results.multiHandLandmarks?.[0];
+
+ if(!lm){
+
+  dot.style.display="none";
+
+  if(pinch && dragged && handControl){
+   endDrag();
+  }
+
+  pinch=false;
+  return;
+ }
+
+ const thumb=lm[4];
+ const index=lm[8];
+
+ const dist=Math.hypot(
+  thumb.x-index.x,
+  thumb.y-index.y
+ );
+
+ const isPinch=dist<.052;
+
+ const x=(1-(thumb.x+index.x)/2)*innerWidth;
+ const y=((thumb.y+index.y)/2)*innerHeight;
+
+ dot.style.display="block";
+ dot.style.left=x+"px";
+ dot.style.top=y+"px";
+
+ dot.classList.toggle("pinching",isPinch);
+
+ if(!photo || !handControl){
+  pinch=isPinch;
+  return;
+ }
+
+ if(isPinch && !pinch && !dragged){
+
+  const p=findPiece(x,y);
+
+  if(p) beginDrag(p,x,y);
+ }
+
+ if(isPinch && dragged){
+  moveDrag(x,y);
+ }
+
+ if(!isPinch && pinch && dragged){
   endDrag();
+ }
 
-  handEnabled = true;
-}
-
-window.addEventListener("pointerup",finishPointer);
-window.addEventListener("pointercancel",finishPointer);
-
-/* =========================
-   HAND TRACKING
-========================= */
-
-function onHandResults(results) {
-
-  const landmarks =
-    results.multiHandLandmarks?.[0];
-
-  if(!landmarks) {
-
-    dot.style.display = "none";
-
-    if(pinching && dragged && handEnabled) {
-      endDrag();
-    }
-
-    pinching = false;
-
-    return;
-  }
-
-  const thumb = landmarks[4];
-  const index = landmarks[8];
-
-  const distance = Math.hypot(
-    thumb.x-index.x,
-    thumb.y-index.y
-  );
-
-  const pinch = distance < 0.052;
-
-  const x =
-    (1-(thumb.x+index.x)/2)*innerWidth;
-
-  const y =
-    ((thumb.y+index.y)/2)*innerHeight;
-
-  dot.style.display = "block";
-  dot.style.left = x + "px";
-  dot.style.top = y + "px";
-
-  dot.classList.toggle("pinching",pinch);
-
-  if(!photo || !handEnabled) {
-    pinching = pinch;
-    return;
-  }
-
-  // Start dragging
-  if(pinch && !pinching && !dragged) {
-
-    const piece = findPiece(x,y);
-
-    if(piece) {
-      beginDrag(piece,x,y);
-    }
-  }
-
-  // Move
-  if(pinch && dragged) {
-    moveDrag(x,y);
-  }
-
-  // Release
-  if(!pinch && pinching && dragged) {
-    endDrag();
-  }
-
-  pinching = pinch;
+ pinch=isPinch;
 }
 
 /* =========================
-   PROGRESS & WIN
+   PROGRESS
 ========================= */
 
-function updateProgress() {
+function updateProgress(){
 
-  const correct = pieces.filter(
-    p=>p.el.classList.contains("correct")
-  ).length;
+ const n=pieces.filter(
+  p=>p.el.classList.contains("correct")
+ ).length;
 
-  progress.textContent =
-    `${correct} / ${TOTAL}`;
+ progress.textContent=`${n} / ${TOTAL}`;
 
-  if(correct === TOTAL && !solved) {
+ if(n===TOTAL && !solved){
 
-    solved = true;
+  solved=true;
 
-    board.classList.add("done");
+  board.classList.add("done");
 
-    say("ممتاز! اكتملت الصورة 🎉");
+  say("اكتملت الصورة بنجاح!");
 
-    saveBtn.disabled = false;
+  saveBtn.disabled=false;
 
-    celebrate();
-  }
+  celebrate();
+ }
 }
 
 /* =========================
    CELEBRATION
 ========================= */
 
-function celebrate() {
+function celebrate(){
 
-  const colors = [
-    "#ff2d95",
-    "#ffd700",
-    "#00ff99",
-    "#00e5ff",
-    "#ffffff"
-  ];
+ const colors=[
+  "#00ff91",
+  "#ffd700",
+  "#00d9ff",
+  "#ffffff"
+ ];
 
-  for(let i=0;i<90;i++) {
+ for(let i=0;i<75;i++){
 
-    const el = document.createElement("div");
+  const el=document.createElement("div");
 
-    el.className = "confetti";
+  el.style.position="fixed";
+  el.style.width="8px";
+  el.style.height="8px";
+  el.style.left="50%";
+  el.style.top="45%";
+  el.style.background=colors[i%colors.length];
+  el.style.zIndex="180";
+  el.style.pointerEvents="none";
 
-    el.style.left = "50%";
-    el.style.top = "45%";
+  document.body.appendChild(el);
 
-    el.style.background =
-      colors[i%colors.length];
+  const a=Math.random()*Math.PI*2;
+  const d=100+Math.random()*250;
 
-    document.body.appendChild(el);
+  const anim=el.animate([
 
-    const angle = Math.random()*Math.PI*2;
-    const distance = 100+Math.random()*250;
+   {transform:"translate(0,0)",opacity:1},
 
-    const animation = el.animate(
-      [
-        {
-          transform:"translate(0,0) rotate(0)",
-          opacity:1
-        },
-        {
-          transform:
-            `translate(${Math.cos(angle)*distance}px,
-            ${Math.sin(angle)*distance+180}px)
-            rotate(720deg)`,
-          opacity:0
-        }
-      ],
-      {
-        duration:1300+Math.random()*700,
-        easing:"cubic-bezier(.2,.8,.3,1)"
-      }
-    );
+   {
+    transform:`translate(
+     ${Math.cos(a)*d}px,
+     ${Math.sin(a)*d+160}px
+    ) rotate(720deg)`,
+    opacity:0
+   }
 
-    animation.onfinish = ()=>el.remove();
-  }
+  ],{
+   duration:1300+Math.random()*600,
+   easing:"ease-out"
+  });
 
-  if(navigator.vibrate) {
-    navigator.vibrate([100,50,100]);
-  }
+  anim.onfinish=()=>el.remove();
+ }
+
+ if(navigator.vibrate){
+  navigator.vibrate([100,50,100]);
+ }
 }
 
 /* =========================
-   SAVE FINAL PHOTO
+   SAVE IMAGE
 ========================= */
 
-function saveImage() {
+function saveImage(){
 
-  if(!solved || !photo) {
-    toast("أكملي البازل أولاً");
-    return;
-  }
+ if(!solved || !photo){
+  toast("أكملي الصورة أولاً");
+  return;
+ }
 
-  const img = new Image();
+ const a=document.createElement("a");
 
-  img.onload = ()=> {
+ a.href=photo;
+ a.download="PUZZLE-CAM.png";
 
-    const canvas = document.createElement("canvas");
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
 
-    canvas.width = 900;
-    canvas.height = 900;
-
-    const ctx = canvas.getContext("2d");
-
-    ctx.drawImage(img,0,0,900,900);
-
-    canvas.toBlob(blob=> {
-
-      if(!blob) {
-        toast("تعذر تجهيز الصورة");
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-
-      a.href = url;
-      a.download = "EMAN-PUZZLE.png";
-
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setTimeout(()=>URL.revokeObjectURL(url),3000);
-
-      toast("تم حفظ الصورة");
-
-    },"image/png");
-  };
-
-  img.onerror = ()=> {
-    toast("تعذر تحميل الصورة");
-  };
-
-  img.src = photo;
+ toast("تم تجهيز الصورة للحفظ");
 }
 
 /* =========================
    RESET
 ========================= */
 
-function resetGame() {
+function resetGame(){
 
-  if(dragged) {
-    dragged.el.classList.remove("drag");
-    dragged = null;
-  }
+ if(dragged){
+  dragged.el.classList.remove("drag");
+  dragged=null;
+ }
 
-  piecesLayer.innerHTML = "";
+ photo=null;
+ pieces=[];
+ solved=false;
+ pinch=false;
 
-  pieces = [];
-  photo = null;
-  solved = false;
-  pinching = false;
+ piecesLayer.innerHTML="";
 
-  saveBtn.disabled = true;
+ board.classList.remove("visible","done");
 
-  progress.textContent = "0 / 9";
+ saveBtn.disabled=true;
 
-  board.classList.remove("done");
+ progress.textContent="0 / 9";
 
-  countEl.style.display = "none";
+ faceStatus.textContent="SCANNING FACE...";
 
-  say("اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋");
+ say("انظري إلى الكاميرا لاكتشاف الوجه");
+
 }
 
 /* =========================
-   CAMERA & MEDIAPIPE
+   CAMERA INIT
 ========================= */
 
-async function initializeCamera() {
+async function initialize(){
 
-  try {
+ try{
 
-    if(!navigator.mediaDevices ||
-       !navigator.mediaDevices.getUserMedia) {
+  $("loadText").textContent="LOADING FACE DETECTION...";
 
-      throw new Error(
-        "يجب فتح الصفحة عبر HTTPS أو localhost لتشغيل الكاميرا"
-      );
-    }
-
-    if(typeof Hands === "undefined") {
-      throw new Error(
-        "تعذر تحميل مكتبة تتبع اليد. تحققي من الإنترنت."
-      );
-    }
-
-    hands = new Hands({
-      locateFile: file =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-
-    hands.setOptions({
-      maxNumHands:1,
-      modelComplexity:0,
-      minDetectionConfidence:0.62,
-      minTrackingConfidence:0.58
-    });
-
-    hands.onResults(onHandResults);
-
-    stream = await navigator.mediaDevices.getUserMedia({
-
-      video:{
-        facingMode:"user",
-        width:{ideal:640},
-        height:{ideal:480},
-        frameRate:{ideal:24,max:30}
-      },
-
-      audio:false
-    });
-
-    video.srcObject = stream;
-
-    await new Promise((resolve,reject)=> {
-
-      if(video.readyState >= 2) {
-        resolve();
-        return;
-      }
-
-      video.onloadedmetadata = ()=>resolve();
-
-      video.onerror = ()=>reject(
-        new Error("تعذر تشغيل الفيديو")
-      );
-
-    });
-
-    await video.play();
-
-    ready = true;
-
-    status.textContent =
-      "الكاميرا جاهزة · ارفعي يدك للتحكم";
-
-    say("اضغطي ابدأ وارفعي يدك أمام الكاميرا ✋");
-
-    // Process only one frame at a time
-    async function processFrame(now) {
-
-      if(!ready) return;
-
-      if(
-        !processing &&
-        now-lastSend > 65 &&
-        video.readyState >= 2
-      ) {
-
-        processing = true;
-
-        lastSend = now;
-
-        try {
-
-          await hands.send({
-            image:video
-          });
-
-        } catch(error) {
-
-          console.warn("Hand tracking:",error);
-
-        } finally {
-
-          processing = false;
-        }
-      }
-
-      rafId = requestAnimationFrame(processFrame);
-    }
-
-    rafId = requestAnimationFrame(processFrame);
-
-  } catch(error) {
-
-    console.error(error);
-
-    ready = false;
-
-    status.textContent = "تعذر تشغيل الكاميرا";
-
-    say(error.message || "تحققي من إذن الكاميرا");
-
-    toast("تحققي من إذن الكاميرا والإنترنت");
+  if(!navigator.mediaDevices?.getUserMedia){
+   throw new Error(
+    "الكاميرا تحتاج HTTPS أو localhost"
+   );
   }
+
+  if(typeof FaceDetection==="undefined" ||
+     typeof Hands==="undefined"){
+   throw new Error(
+    "فشل تحميل مكتبات الذكاء الاصطناعي. تحققي من الإنترنت."
+   );
+  }
+
+  faceDetector=new FaceDetection({
+   locateFile:file=>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+  });
+
+  faceDetector.setOptions({
+   model:"short",
+   minDetectionConfidence:.55
+  });
+
+  faceDetector.onResults(onFaceResults);
+
+  handDetector=new Hands({
+   locateFile:file=>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
+
+  handDetector.setOptions({
+   maxNumHands:1,
+   modelComplexity:0,
+   minDetectionConfidence:.6,
+   minTrackingConfidence:.55
+  });
+
+  handDetector.onResults(onHandResults);
+
+  $("loadText").textContent="REQUESTING CAMERA...";
+
+  stream=await navigator.mediaDevices.getUserMedia({
+
+   audio:false,
+
+   video:{
+    facingMode:"user",
+    width:{ideal:640},
+    height:{ideal:480},
+    frameRate:{ideal:24,max:30}
+   }
+
+  });
+
+  video.srcObject=stream;
+
+  await new Promise((resolve,reject)=>{
+
+   if(video.readyState>=2){
+    resolve();
+    return;
+   }
+
+   video.onloadedmetadata=resolve;
+
+   video.onerror=()=>reject(
+    new Error("تعذر قراءة الكاميرا")
+   );
+
+  });
+
+  await video.play();
+
+  ready=true;
+
+  loading.classList.add("hide");
+
+  say("انظري إلى الكاميرا لاكتشاف الوجه");
+
+  renderLoop();
+
+  processLoop();
+
+ }catch(e){
+
+  console.error(e);
+
+  loading.classList.remove("hide");
+
+  $("loadText").textContent=
+   "CAMERA ERROR: "+e.message;
+
+  say("تحققي من صلاحية الكاميرا والاتصال بالإنترنت");
+
+  toast(e.message);
+ }
+
+/* =========================
+   FRAME PROCESSING
+========================= */
+
+ async function processLoop(){
+
+  if(!ready) return;
+
+  const now=performance.now();
+
+  if(!processing &&
+     video.readyState>=2 &&
+     now-lastFrame>100){
+
+   processing=true;
+   lastFrame=now;
+
+   try{
+
+    // Face detection always runs
+    await faceDetector.send({
+     image:video
+    });
+
+    // Hand detection only during puzzle
+    if(photo){
+     await handDetector.send({
+      image:video
+     });
+    }else{
+     dot.style.display="none";
+    }
+
+   }catch(e){
+
+    console.warn("AI processing:",e);
+
+   }finally{
+
+    processing=false;
+   }
+  }
+
+  setTimeout(processLoop,20);
+ }
 }
 
 /* =========================
    EVENTS
 ========================= */
 
-startBtn.addEventListener(
-  "click",
-  startCountdown
+$("start").addEventListener(
+ "click",
+ startCapture
 );
 
-saveBtn.addEventListener(
-  "click",
-  saveImage
+$("save").addEventListener(
+ "click",
+ saveImage
 );
 
 $("reset").addEventListener(
-  "click",
-  resetGame
+ "click",
+ resetGame
 );
 
 /* =========================
    CLEANUP
 ========================= */
 
-window.addEventListener("pagehide",()=> {
+window.addEventListener("pagehide",()=>{
 
-  ready = false;
+ ready=false;
 
-  if(rafId) {
-    cancelAnimationFrame(rafId);
-  }
+ if(animationId){
+  cancelAnimationFrame(animationId);
+ }
 
-  if(stream) {
-    stream.getTracks().forEach(
-      track=>track.stop()
-    );
-  }
+ if(stream){
+  stream.getTracks().forEach(
+   t=>t.stop()
+  );
+ }
 
-  if(hands && hands.close) {
-    hands.close();
-  }
+ try{
+  faceDetector?.close();
+  handDetector?.close();
+ }catch(e){}
+
 });
 
 /* =========================
-   START
+   START APP
 ========================= */
 
-initializeCamera();
+initialize();
 
-})();
 </script>
-
 </body>
 </html>
