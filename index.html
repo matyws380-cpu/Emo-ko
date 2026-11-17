@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PUZZLE CAM - EMAN 👻</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
+body{background:#000;overflow:hidden}
+#webcam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#scene{position:fixed;inset:0}
+#hud-top{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;z-index:20;color:white;font-weight:900;text-shadow:0 0 8px #000}
+#hud-top span{background:rgba(0,0,0,.6);padding:6px 12px;border-radius:20px;font-size:13px}
+#frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78vw,380px);height:min(78vw,380px);border:4px solid #FFD700;z-index:10;pointer-events:none;transition:border-color .3s}
+#frame.done{border-color:#00ff88}
+#count{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:110px;font-weight:900;color:#FFD700;z-index:30;text-shadow:0 0 30px #000;display:none}
+#msg{position:absolute;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#00ff88;padding:8px 18px;border-radius:20px;font-weight:900;z-index:30;white-space:nowrap}
+#pieces{position:absolute;inset:0;z-index:15}
+.piece{position:absolute;background-size:380px 380px;border:1px solid rgba(255,255,255,.6);cursor:grab;transition:transform .15s;box-shadow:0 4px 15px rgba(0,0,0,.4)}
+.piece.correct{border:2px solid #00ff88;box-shadow:0 0 15px #00ff88}
+.piece.drag{border:3px solid #FFD700;transform:scale(1.08);z-index:99!important}
+#menu{position:fixed;bottom:12px;left:0;right:0;display:flex;gap:8px;justify-content:center;z-index:40;flex-wrap:wrap;padding:0 10px}
+.btn{padding:11px 16px;border-radius:20px;border:none;font-weight:900;cursor:pointer}
+.btn.active{background:#ff2d95;color:white}
+.btn:not(.active){background:rgba(255,255,255,.85);color:#000}
+#handDot{position:absolute;width:22px;height:22px;background:#FFD700;border:3px solid white;border-radius:50%;z-index:50;pointer-events:none;transform:translate(-50%,-50%);display:none;box-shadow:0 0 15px #FFD700}
+#handDot.pinch{background:#00ff88;width:32px;height:32px}
+.confetti{position:absolute;width:10px;height:10px;z-index:60;pointer-events:none}
+</style>
+</head>
+<body>
+<video id="webcam" playsinline></video>
+<div id="scene">
+<div id="hud-top"><span>PUZZLE CAM - EMAN 👻</span><span id="progress">0 / 9 PIECES COLOCADAS</span></div>
+<div id="frame"></div>
+<div id="count">3</div>
+<div id="msg">ارفع ايدك للتصوير ✋</div>
+<div id="pieces"></div>
+<div id="handDot"></div>
+</div>
+<div id="menu">
+<button class="btn active" onclick="startGame(this)">📸 ابدأ من جديد</button>
+<button class="btn" onclick="toggleGhost(this)">👻 شبح ايمان</button>
+<button class="btn" onclick="location.reload()">🔄 إعادة</button>
+</div>
+
+<script>
+const video=document.getElementById('webcam');
+const frame=document.getElementById('frame');
+const countEl=document.getElementById('count');
+const msgEl=document.getElementById('msg');
+const piecesEl=document.getElementById('pieces');
+const progressEl=document.getElementById('progress');
+const dot=document.getElementById('handDot');
+let GRID=3, pieces=[], captured=null, handPos={x:0.5,y:0.5}, isPinch=false, dragged=null, dragOffset={x:0,y:0};
+let ghostOn=false, gameStarted=false, countdownDone=false;
+
+// رسم الكاميرا على الكانفس عشان ناخد صورة
+function capturePhoto(){
+  const c=document.createElement('canvas'); c.width=380; c.height=380;
+  const ctx=c.getContext('2d');
+  // نحسب القص من الفيديو - زي الفيديو بالظبط
+  const vw=video.videoWidth, vh=video.videoHeight;
+  const size=Math.min(vw,vh);
+  const sx=(vw-size)/2, sy=(vh-size)/2;
+  ctx.save(); ctx.translate(380,0); ctx.scale(-1,1); // عكس عشان المراية
+  ctx.drawImage(video, sx, sy, size, size, 0, 0, 380, 380);
+  ctx.restore();
+  // فلتر ابيض واسود زي الفيديو
+  const imgData=ctx.getImageData(0,0,380,380);
+  const d=imgData.data;
+  for(let i=0;i<d.length;i+=4){ let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; d[i]=g; d[i+1]=g; d[i+2]=g; }
+  ctx.putImageData(imgData,0,0);
+  return c.toDataURL();
+}
+
+function startGame(btn){
+  if(btn) document.querySelectorAll('#menu .btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  piecesEl.innerHTML=''; pieces=[]; gameStarted=true; countdownDone=false;
+  frame.style.borderColor='#FFD700'; frame.classList.remove('done');
+  msgEl.textContent='استعد... 3';
+  let n=3;
+  countEl.style.display='block'; countEl.textContent=n;
+  let timer=setInterval(()=>{
+    n--; 
+    if(n>0){ countEl.textContent=n; msgEl.textContent='استعد... '+n; }
+    else { clearInterval(timer); countEl.style.display='none'; msgEl.textContent='تم التصوير! رتب القطع بإيدك'; captured=capturePhoto(); buildPuzzle(); countdownDone=true; }
+  },1000);
+}
+
+function buildPuzzle(){
+  piecesEl.innerHTML=''; pieces=[];
+  let fw=frame.offsetWidth, fh=frame.offsetHeight;
+  let fx=frame.offsetLeft, fy=frame.offsetTop;
+  let pw=fw/GRID, ph=fh/GRID;
+  let order=[...Array(GRID*GRID).keys()];
+  // خلط زي الفيديو
+  for(let i=order.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+  order.forEach((correctIdx,i)=>{
+    let col=i%GRID, row=Math.floor(i/GRID);
+    let el=document.createElement('div');
+    el.className='piece';
+    el.style.width=pw+'px'; el.style.height=ph+'px';
+    el.style.left=(fx+col*pw)+'px'; el.style.top=(fy+row*ph)+'px';
+    el.style.backgroundImage=`url(${captured})`;
+    el.style.backgroundSize=`${fw}px ${fh}px`;
+    // مكان القطعة الصح في الصورة الأصلية
+    let cc=correctIdx%GRID, cr=Math.floor(correctIdx/GRID);
+    el.style.backgroundPosition=`${-cc*pw}px ${-cr*ph}px`;
+    el.dataset.correct=correctIdx; el.dataset.current=i;
+    piecesEl.appendChild(el);
+    pieces.push({el, correct:correctIdx, current:i, x:fx+col*pw, y:fy+row*ph});
+  });
+  checkWin();
+}
+
+function checkWin(){
+  let correct=0;
+  pieces.forEach(p=>{
+    // لو القطعة في مكانها الصح تقريبا
+    let fw=frame.offsetWidth, pw=fw/GRID;
+    let cc=p.correct%GRID, cr=Math.floor(p.correct/GRID);
+    let targetX=frame.offsetLeft+cc*pw, targetY=frame.offsetTop+cr*pw;
+    let dx=Math.abs(p.x-targetX), dy=Math.abs(p.y-targetY);
+    if(dx<18 && dy<18){ p.el.classList.add('correct'); correct++; }
+    else p.el.classList.remove('correct');
+  });
+  progressEl.textContent=`${correct} / 9 PIECES COLOCADAS`;
+  if(correct===9 && countdownDone){
+    frame.style.borderColor='#00ff88'; frame.classList.add('done');
+    msgEl.textContent='¡COMPLETO! EMAN 👻 - اقفل ايدك عشان تحفظ';
+    setTimeout(explode, 400);
+  }
+}
+
+function explode(){
+  for(let i=0;i<120;i++){
+    let s=document.createElement('div'); s.className='confetti';
+    s.style.left='50%'; s.style.top='50%';
+    s.style.background=['#ff2d95','#FFD700','#00ff88','#00e5ff','#fff'][i%5];
+    document.body.appendChild(s);
+    let ang=Math.random()*Math.PI*2, dist=100+Math.random()*280;
+    s.animate([{transform:'translate(0,0) rotate(0deg)',opacity:1},{transform:`translate(${Math.cos(ang)*dist}px,${Math.sin(ang)*dist+180}px) rotate(720deg)`,opacity:0}],{duration:1400+Math.random()*800,easing:'cubic-bezier(.2,.8,.3,1)'}).onfinish=()=>s.remove();
+  }
+  navigator.vibrate&&navigator.vibrate([100,50,100]);
+}
+
+function toggleGhost(btn){
+  ghostOn=!ghostOn; btn.classList.toggle('active',ghostOn);
+  msgEl.textContent=ghostOn?'👻 شبح ايمان اشتغل - اضحك هيضحك معاك':'👻 شبح ايمان اتقفل';
+}
+
+// ===== تتبع الايد - القرصة Pinch =====
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({maxNumHands:1, modelComplexity:0, minDetectionConfidence:0.65, minTrackingConfidence:0.65});
+hands.onResults(res=>{
+  if(!res.multiHandLandmarks||!res.multiHandLandmarks.length){ dot.style.display='none'; return; }
+  let lm=res.multiHandLandmarks[0];
+  // نقطة الايد = بين الإبهام والسبابة - زي الفيديو
+  let thumb=lm[4], index=lm[8];
+  let pinchDist=Math.hypot(thumb.x-index.x, thumb.y-index.y);
+  let pinch = pinchDist < 0.05; // قرصة
+  let px=(1-(thumb.x+index.x)/2)*innerWidth;
+  let py=((thumb.y+index.y)/2)*innerHeight;
+  handPos={x:px/innerWidth, y:py/innerHeight};
+  dot.style.display='block'; dot.style.left=px+'px'; dot.style.top=py+'px';
+  dot.classList.toggle('pinch', pinch);
+
+  // لو عملت قبضة بعد الفوز = حفظ الصورة
+  let fingers=0;
+  if(lm[8].y<lm[6].y) fingers++;
+  if(lm[12].y<lm[10].y) fingers++;
+  if(lm[16].y<lm[14].y) fingers++;
+  if(lm[20].y<lm[18].y) fingers++;
+  if(fingers===0 && countdownDone && pieces.length>0){
+    let allCorrect = pieces.every(p=>p.el.classList.contains('correct'));
+    if(allCorrect){ msgEl.textContent='📸 اتحفظت يا ايمان! 👻'; }
+  }
+
+  if(!countdownDone) return;
+
+  if(pinch && !dragged){
+    // دور على القطعة اللي تحت ايدك
+    for(let p of pieces){
+      let rect=p.el.getBoundingClientRect();
+      if(px>=rect.left && px<=rect.right && py>=rect.top && py<=rect.bottom){
+        dragged=p; dragOffset={x:px-rect.left, y:py-rect.top};
+        p.el.classList.add('drag'); break;
+      }
+    }
+  } else if(pinch && dragged){
+    let nx=px-dragOffset.x, ny=py-dragOffset.y;
+    dragged.x=nx; dragged.y=ny;
+    dragged.el.style.left=nx+'px'; dragged.el.style.top=ny+'px';
+    // مغناطيس: لو قربت من مكانها الصح، الزقها
+    let fw=frame.offsetWidth, pw=fw/GRID;
+    let cc=dragged.correct%GRID, cr=Math.floor(dragged.correct/GRID);
+    let tx=frame.offsetLeft+cc*pw, ty=frame.offsetTop+cr*pw;
+    if(Math.abs(nx-tx)<22 && Math.abs(ny-ty)<22){
+      dragged.x=tx; dragged.y=ty;
+      dragged.el.style.left=tx+'px'; dragged.el.style.top=ty+'px';
+      dragged.el.classList.add('correct');
+    }
+  } else if(!pinch && dragged){
+    dragged.el.classList.remove('drag');
+    // سناب للمكان الصح لو قريب
+    let fw=frame.offsetWidth, pw=fw/GRID;
+    let cc=dragged.correct%GRID, cr=Math.floor(dragged.correct/GRID);
+    let tx=frame.offsetLeft+cc*pw, ty=frame.offsetTop+cr*pw;
+    if(Math.abs(dragged.x-tx)<25 && Math.abs(dragged.y-ty)<25){
+      dragged.x=tx; dragged.y=ty;
+      dragged.el.style.left=tx+'px'; dragged.el.style.top=ty+'px';
+    }
+    dragged=null;
+    checkWin();
+  }
+});
+
+const cam=new Camera(video,{onFrame:async()=>{ await hands.send({image:video}); },width:640,height:480});
+cam.start();
+
+// ابدأ لوحده بعد ثانيتين
+setTimeout(()=>startGame(null), 800);
+</script>
+</body>
+  </html>
