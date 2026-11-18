@@ -1,1503 +1,1667 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#020907">
 <title>PUZZLE CAM</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
 <style>
-:root{--green:#39ff88;--mint:#a6ffd0;--bg:#020907;--panel:rgba(2,18,12,.78);--line:rgba(57,255,136,.42);--red:#ff536b}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#eafff2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-body{touch-action:none}
-#app{position:fixed;inset:0;background:#000;overflow:hidden}
-#camera{position:absolute;width:100%;height:100%;inset:0;object-fit:cover;transform:scaleX(-1);background:#000}
-#fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-#vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,.58) 100%)}
-#topbar{position:absolute;z-index:8;top:env(safe-area-inset-top,8px);left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
-.brand{font-weight:900;letter-spacing:2px;color:var(--green);text-shadow:0 0 14px #00ff77;font-size:clamp(16px,4vw,22px)}
-.pill{border:1px solid var(--line);background:rgba(0,10,6,.7);border-radius:999px;padding:7px 11px;font-size:11px;color:#caffdf;backdrop-filter:blur(8px)}
-#status{position:absolute;z-index:8;top:56px;left:12px;right:12px;text-align:center;font-size:clamp(12px,3vw,15px);color:#baffd2;text-shadow:0 0 9px #00ff77;pointer-events:none}
-#hud{position:absolute;z-index:7;inset:0;pointer-events:none;opacity:0;transition:opacity .35s}
-#hud.active{opacity:1}
-.corner{position:absolute;width:46px;height:46px;border-color:var(--green);filter:drop-shadow(0 0 7px var(--green))}
-.tl{top:13%;left:7%;border-top:2px solid;border-left:2px solid}.tr{top:13%;right:7%;border-top:2px solid;border-right:2px solid}
-.bl{bottom:15%;left:7%;border-bottom:2px solid;border-left:2px solid}.br{bottom:15%;right:7%;border-bottom:2px solid;border-right:2px solid}
-#faceBox{position:absolute;border:1px solid var(--green);box-shadow:0 0 15px #00ff7780,inset 0 0 20px #00ff7720;border-radius:14px;display:none}
-#faceBox:before{content:"FACE / TRACKED";position:absolute;top:-22px;right:0;color:var(--green);font:10px monospace;letter-spacing:1px}
-#scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#39ff88,white,#39ff88,transparent);box-shadow:0 0 18px #39ff88;opacity:0;top:20%}
-#scanline.run{opacity:.9;animation:scan 2.1s linear infinite}
-@keyframes scan{0%{top:17%}100%{top:82%}}
-#gridOverlay{position:absolute;inset:0;opacity:0;background-image:linear-gradient(#39ff8810 1px,transparent 1px),linear-gradient(90deg,#39ff8810 1px,transparent 1px);background-size:34px 34px;transition:opacity .4s}
-#gridOverlay.on{opacity:1}
-#readout{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#9dffc2;font:10px monospace;text-shadow:0 0 6px #00ff77}
-#loading{position:absolute;z-index:20;inset:0;background:#020907;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
-#loading.hidden{display:none}
-.spinner{width:42px;height:42px;border:2px solid #16452d;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#loading h1{margin:0;color:var(--green);letter-spacing:3px;font-size:24px}
-#loading p{max-width:330px;color:#b2d9c0;font-size:13px;line-height:1.8;margin:0}
-#startBtn,#retryBtn{border:1px solid var(--green);background:#06351e;color:#dffff0;padding:12px 22px;border-radius:12px;font-weight:800;font-size:14px}
-#startBtn:disabled{opacity:.5}
-#error{color:#ff9cab;white-space:pre-wrap;font-size:12px;line-height:1.6;max-width:95%;direction:ltr;text-align:left}
-#countdown{position:absolute;z-index:9;inset:0;display:none;align-items:center;justify-content:center;font-size:min(32vw,150px);font-weight:900;color:#d9ffe7;text-shadow:0 0 12px #00ff77,0 0 50px #00ff77;pointer-events:none}
-#countdown.show{display:flex}
-#flash{position:absolute;z-index:10;inset:0;background:white;opacity:0;pointer-events:none}
-#flash.hit{animation:flash .35s}
-@keyframes flash{0%{opacity:.85}100%{opacity:0}}
-#game{position:absolute;z-index:15;inset:0;background:radial-gradient(ellipse at center,#082117,#010503 75%);display:none;flex-direction:column;align-items:center;justify-content:center;padding:68px 12px 55px;gap:10px}
-#game.show{display:flex}
-#gameHead{width:min(92vw,520px);display:flex;justify-content:space-between;align-items:center;color:var(--green);font-size:12px}
-#boardWrap{position:relative;width:min(88vw, min(58vh,520px));aspect-ratio:1;border:1px solid #39ff8880;box-shadow:0 0 25px #00ff7730;padding:5px;background:#03140c}
-#board{width:100%;height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:3px}
-.tile{position:relative;overflow:hidden;border:1px solid #39ff8866;background:#071b11;touch-action:none}
-.tile canvas{width:100%;height:100%;display:block}
-.tile.selected{outline:3px solid #eaff6b;z-index:3;box-shadow:0 0 20px #dfff48}
-.tile:after{content:attr(data-n);position:absolute;top:4px;left:5px;color:#caffd8;font:10px monospace;text-shadow:0 1px 4px #000}
-#gameHint{font-size:12px;color:#c3f7d4;text-align:center;line-height:1.7;max-width:420px}
-#progress{height:5px;width:min(88vw,520px);background:#123321;border-radius:99px;overflow:hidden}
-#progressFill{height:100%;width:0;background:var(--green);box-shadow:0 0 12px var(--green);transition:width .2s}
-#gameActions{display:flex;gap:8px}
-.gameBtn{background:#062c19;border:1px solid #39ff8880;color:#caffd8;border-radius:10px;padding:8px 12px;font-size:11px}
-#win{position:absolute;z-index:30;inset:0;background:#001309eF;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:12px}
-#win.show{display:flex}
-#win h2{font-size:32px;color:var(--green);margin:0;text-shadow:0 0 18px var(--green)}
-#win p{color:#d7ffe5}
-#pointer{position:absolute;z-index:18;width:25px;height:25px;border:2px solid #dfff5d;border-radius:50%;transform:translate(-50%,-50%);display:none;pointer-events:none;box-shadow:0 0 15px #dfff5d}
-#pointer:after{content:"";position:absolute;inset:6px;background:#dfff5d;border-radius:50%}
-#toast{position:absolute;z-index:22;top:90px;left:50%;transform:translateX(-50%);background:#052515;border:1px solid #39ff88;color:#dffff0;padding:9px 13px;border-radius:10px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
-#toast.show{opacity:1}
-@media(min-width:700px){#boardWrap{width:min(60vh,520px)}}
+:root{
+ --green:#00ff91;
+ --green2:#00c875;
+ --gold:#ffd700;
+ --black:#020907;
+ --panel:rgba(0,20,12,.82);
+}
+
+*{
+ margin:0;
+ padding:0;
+ box-sizing:border-box;
+}
+
+html,body{
+ width:100%;
+ height:100%;
+ overflow:hidden;
+ background:#020907;
+ color:white;
+ font-family:system-ui,sans-serif;
+ touch-action:none;
+}
+
+#video{
+ position:fixed;
+ inset:0;
+ width:100%;
+ height:100%;
+ object-fit:cover;
+ transform:scaleX(-1);
+ background:#000;
+}
+
+#fx{
+ position:fixed;
+ inset:0;
+ width:100%;
+ height:100%;
+ z-index:5;
+ pointer-events:none;
+}
+
+#scanlines{
+ position:fixed;
+ inset:0;
+ z-index:6;
+ pointer-events:none;
+ opacity:.22;
+ background:repeating-linear-gradient(
+  0deg,
+  transparent 0px,
+  transparent 3px,
+  #00ff9130 4px,
+  transparent 5px
+ );
+}
+
+#vignette{
+ position:fixed;
+ inset:0;
+ z-index:7;
+ pointer-events:none;
+ background:radial-gradient(
+  ellipse at center,
+  transparent 30%,
+  #001c10aa 100%
+ );
+}
+
+#grid{
+ position:fixed;
+ inset:0;
+ z-index:8;
+ pointer-events:none;
+ opacity:0;
+ transition:.5s;
+ background-image:
+  linear-gradient(#00ff9110 1px,transparent 1px),
+  linear-gradient(90deg,#00ff9110 1px,transparent 1px);
+ background-size:38px 38px;
+}
+
+#grid.active{
+ opacity:1;
+}
+
+#header{
+ position:fixed;
+ top:15px;
+ left:14px;
+ right:14px;
+ z-index:30;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ direction:ltr;
+}
+
+.hud{
+ padding:9px 13px;
+ border:1px solid #00ff9177;
+ background:#001b12bb;
+ color:var(--green);
+ font-size:11px;
+ font-weight:900;
+ letter-spacing:1px;
+ border-radius:5px;
+ backdrop-filter:blur(8px);
+ box-shadow:0 0 15px #00ff9133;
+ text-shadow:0 0 8px #00ff91;
+}
+
+#faceStatus{
+ position:fixed;
+ top:72px;
+ left:50%;
+ transform:translateX(-50%);
+ z-index:30;
+ color:var(--green);
+ font-size:11px;
+ letter-spacing:2px;
+ font-weight:900;
+ text-shadow:0 0 12px var(--green);
+ white-space:nowrap;
+}
+
+#faceStatus.detected{
+ animation:blink 1s infinite;
+}
+
+@keyframes blink{
+ 50%{opacity:.45}
+}
+
+#systemInfo{
+ position:fixed;
+ bottom:145px;
+ left:12px;
+ z-index:25;
+ display:flex;
+ flex-direction:column;
+ gap:6px;
+ direction:ltr;
+ font:10px monospace;
+ color:#00ff91;
+ text-shadow:0 0 8px #00ff91;
+ pointer-events:none;
+}
+
+.infoLine{
+ background:#001b12a8;
+ padding:5px 8px;
+ border-left:2px solid #00ff91;
+ width:max-content;
+ max-width:85vw;
+}
+
+#board{
+ position:fixed;
+ left:50%;
+ top:46%;
+ transform:translate(-50%,-50%);
+ width:min(78vw,390px,52vh);
+ aspect-ratio:1;
+ border:2px solid var(--gold);
+ box-shadow:0 0 25px #ffd70066;
+ z-index:12;
+ display:none;
+ pointer-events:none;
+}
+
+#board.visible{
+ display:block;
+}
+
+#board.done{
+ border-color:var(--green);
+ box-shadow:0 0 30px #00ff9188;
+}
+
+#pieces{
+ position:fixed;
+ inset:0;
+ z-index:15;
+ pointer-events:none;
+}
+
+.piece{
+ position:absolute;
+ background-repeat:no-repeat;
+ border:1px solid #ffffffaa;
+ box-shadow:0 4px 15px #0009;
+ pointer-events:auto;
+ touch-action:none;
+ user-select:none;
+ -webkit-user-select:none;
+}
+
+.piece.drag{
+ z-index:100!important;
+ border:2px solid var(--gold);
+ box-shadow:0 0 22px #ffd700aa;
+ transform:scale(1.04);
+}
+
+.piece.correct{
+ border:2px solid var(--green);
+ box-shadow:0 0 12px #00ff9188;
+}
+
+#handDot{
+ position:fixed;
+ width:20px;
+ height:20px;
+ border:2px solid white;
+ border-radius:50%;
+ background:var(--green);
+ box-shadow:0 0 18px var(--green);
+ transform:translate(-50%,-50%);
+ pointer-events:none;
+ display:none;
+ z-index:110;
+}
+
+#handDot.pinching{
+ width:30px;
+ height:30px;
+ background:var(--gold);
+ box-shadow:0 0 20px var(--gold);
+}
+
+#message{
+ position:fixed;
+ bottom:95px;
+ left:50%;
+ transform:translateX(-50%);
+ padding:11px 16px;
+ background:#001b12ee;
+ border:1px solid #00ff9166;
+ color:var(--green);
+ font-size:12px;
+ font-weight:900;
+ text-align:center;
+ border-radius:5px;
+ z-index:35;
+ max-width:94vw;
+ white-space:nowrap;
+ box-shadow:0 0 15px #00ff9122;
+}
+
+#count{
+ position:fixed;
+ inset:0;
+ display:none;
+ place-items:center;
+ font-size:120px;
+ font-weight:1000;
+ color:var(--green);
+ text-shadow:0 0 30px var(--green);
+ z-index:150;
+}
+
+#controls{
+ position:fixed;
+ bottom:max(15px,env(safe-area-inset-bottom));
+ left:0;
+ right:0;
+ display:flex;
+ justify-content:center;
+ gap:9px;
+ flex-wrap:wrap;
+ padding:0 8px;
+ z-index:130;
+}
+
+button{
+ border:1px solid #00ff9188;
+ background:#001c12ee;
+ color:var(--green);
+ padding:12px 17px;
+ border-radius:5px;
+ font-size:12px;
+ font-weight:900;
+ box-shadow:0 0 12px #00ff9122;
+}
+
+button.primary{
+ background:#00c875;
+ color:#00150d;
+ border-color:var(--green);
+}
+
+button:disabled{
+ opacity:.35;
+}
+
+#toast{
+ position:fixed;
+ top:20%;
+ left:50%;
+ transform:translate(-50%,-10px);
+ background:#001b12;
+ border:1px solid var(--green);
+ color:var(--green);
+ padding:12px 18px;
+ z-index:200;
+ opacity:0;
+ transition:.25s;
+ font-weight:900;
+ border-radius:5px;
+ text-align:center;
+ max-width:90vw;
+}
+
+#toast.show{
+ opacity:1;
+ transform:translate(-50%,0);
+}
+
+#loading{
+ position:fixed;
+ inset:0;
+ z-index:300;
+ background:#020907;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ flex-direction:column;
+ gap:15px;
+}
+
+#loading.hide{
+ display:none;
+}
+
+.loader{
+ width:45px;
+ height:45px;
+ border:3px solid #16412c;
+ border-top-color:var(--green);
+ border-radius:50%;
+ animation:spin .8s linear infinite;
+}
+
+@keyframes spin{
+ to{transform:rotate(360deg)}
+}
+
+#loadText{
+ color:var(--green);
+ font-size:12px;
+ letter-spacing:2px;
+ font-weight:900;
+ text-align:center;
+ padding:0 20px;
+}
+
+#loadError{
+ color:#ff7b8e;
+ font-size:12px;
+ max-width:90%;
+ text-align:center;
+ line-height:1.8;
+}
+
+#success{
+ position:fixed;
+ inset:0;
+ z-index:190;
+ display:none;
+ align-items:center;
+ justify-content:center;
+ flex-direction:column;
+ gap:15px;
+ background:#001309e8;
+ text-align:center;
+}
+
+#success.show{
+ display:flex;
+}
+
+#success h1{
+ color:var(--green);
+ font-size:30px;
+ text-shadow:0 0 20px var(--green);
+}
+
+#success p{
+ color:#d4ffe4;
+ font-size:13px;
+}
+
+@media(max-height:620px){
+ #board{
+  top:43%;
+  width:min(65vw,46vh);
+ }
+ #message{bottom:80px}
+ button{padding:9px 13px}
+ #systemInfo{bottom:125px}
+}
 </style>
 </head>
+
 <body>
-<div id="app">
-  <video id="camera" autoplay muted playsinline></video>
-  <canvas id="fx"></canvas>
-  <div id="vignette"></div>
-  <div id="gridOverlay"></div>
-  <div id="topbar"><div class="brand">PUZZLE CAM</div><div class="pill" id="modePill">CAMERA MODE</div></div>
-  <div id="status">الكاميرا هتفتح بشكل طبيعي أولاً</div>
-  <div id="hud">
-    <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-    <div id="faceBox"></div><div id="scanline"></div>
-    <div id="readout"><span id="readA">SYS: ONLINE</span><span id="readB">FACE: SEARCHING</span><span id="readC">HAND: WAIT</span></div>
-  </div>
-  <div id="countdown"></div><div id="flash"></div>
-  <div id="pointer"></div><div id="toast"></div>
-  <section id="game">
-    <div id="gameHead"><b>FACE PUZZLE / 3×3</b><span id="moves">MOVES: 0</span></div>
-    <div id="boardWrap"><div id="board"></div></div>
-    <div id="progress"><div id="progressFill"></div></div>
-    <div id="gameHint">اقرص بإصبعيك فوق قطعة واسحبها لمكانها الصحيح. أو المس قطعتين للتبديل.</div>
-    <div id="gameActions"><button class="gameBtn" id="backBtn">رجوع للكاميرا</button><button class="gameBtn" id="shuffleBtn">خلط من جديد</button></div>
-  </section>
-  <div id="win"><h2>PUZZLE SOLVED</h2><p>تم تجميع الوجه بنجاح</p><button id="againBtn" class="gameBtn">العب مرة أخرى</button></div>
-  <div id="loading">
-    <div class="spinner" id="spinner"></div>
-    <h1>PUZZLE CAM</h1>
-    <p id="loadText">اضغط تشغيل الكاميرا. هتظهر الصورة طبيعية أولاً، وبعدها يبدأ فحص الوجه والمؤثرات الخضراء تلقائياً.</p>
-    <button id="startBtn">تشغيل الكاميرا</button>
-    <div id="error"></div>
-  </div>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="fx"></canvas>
+
+<div id="scanlines"></div>
+<div id="vignette"></div>
+<div id="grid"></div>
+
+<div id="loading">
+ <div class="loader"></div>
+ <div id="loadText">INITIALIZING PUZZLE CAM...</div>
+ <div id="loadError"></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+
+<div id="header">
+ <div class="hud">PUZZLE CAM</div>
+ <div class="hud" id="progress">0 / 9</div>
+</div>
+
+<div id="faceStatus">SCANNING FACE...</div>
+
+<div id="systemInfo">
+ <div class="infoLine" id="sys1">SYSTEM: INITIALIZING</div>
+ <div class="infoLine" id="sys2">FACE: SEARCHING</div>
+ <div class="infoLine" id="sys3">HAND: STANDBY</div>
+ <div class="infoLine" id="sys4">SECURITY: ACTIVE</div>
+</div>
+
+<div id="board"></div>
+<div id="pieces"></div>
+<div id="handDot"></div>
+
+<div id="message">
+ جاري تشغيل الكاميرا واكتشاف الوجه
+</div>
+
+<div id="count">3</div>
+<div id="toast"></div>
+
+<div id="success">
+ <h1>PUZZLE SOLVED</h1>
+ <p>تم تجميع الوجه بنجاح</p>
+ <button onclick="resetGame()">PLAY AGAIN</button>
+</div>
+
+<div id="controls">
+ <button class="primary" id="start">📸 CAPTURE</button>
+ <button id="save" disabled>⬇ SAVE</button>
+ <button id="reset">↻ RESET</button>
+</div>
+
 <script>
 "use strict";
 
-/* =========================================================
-   PUZZLE CAM
-   One-file browser experience:
-   1) Native camera preview first.
-   2) Face detection and green cyber scan.
-   3) Countdown and face capture.
-   4) 3x3 face puzzle with pinch/drag hand interaction.
-   ========================================================= */
+/* ==========================================
+   PUZZLE CAM - MAIN ELEMENTS
+========================================== */
 
-const $ = (id) => document.getElementById(id);
-const video = $("camera");
+const $ = id => document.getElementById(id);
+
+const video = $("video");
 const fx = $("fx");
 const ctx = fx.getContext("2d");
-const startBtn = $("startBtn");
+
+const board = $("board");
+const piecesLayer = $("pieces");
+const dot = $("handDot");
+const message = $("message");
+const faceStatus = $("faceStatus");
+const progress = $("progress");
 const loading = $("loading");
-const loadText = $("loadText");
-const errorBox = $("error");
-const statusText = $("status");
-const hud = $("hud");
-const faceBox = $("faceBox");
-const scanline = $("scanline");
-const gridOverlay = $("gridOverlay");
-const countdownEl = $("countdown");
-const flashEl = $("flash");
-const gameEl = $("game");
-const boardEl = $("board");
-const pointerEl = $("pointer");
-const toastEl = $("toast");
+const countEl = $("count");
+const saveBtn = $("save");
 
-const STATE = {
-  camera:false,
-  models:false,
-  running:false,
-  scanning:false,
-  captured:false,
-  game:false,
-  face:null,
-  hand:null,
-  faceDetector:null,
-  handDetector:null,
-  loopBusy:false,
-  lastFaceProcessAt:0,
-  lastFaceSeenAt:0,
-  lastHandAt:0,
-  lastToast:0,
-  captureTimer:null,
-  raf:0,
-  faceCanvas:null,
-  faceImage:null,
-  tiles:[],
-  moves:0,
-  selected:null,
-  drag:null,
-  pinch:false,
-  lastPinch:false,
-  lastFrame:0,
-  fps:0,
-  frameCount:0,
-  fpsTime:0
-};
+const GRID = 3;
+const TOTAL = GRID * GRID;
 
-const CONFIG = {
-  faceInterval:180,
-  handInterval:90,
-  faceConfidence:0.55,
-  handConfidence:0.55,
-  detectionConfidence:0.55,
-  countdown:3,
-  grid:3,
-  tileGap:3,
-  minPinchDistance:0.055,
-  maxPinchDistance:0.12
-};
+/* ==========================================
+   APP STATE
+========================================== */
 
-function setStatus(message){
-  statusText.textContent = message;
+let stream = null;
+
+let faceDetector = null;
+let handDetector = null;
+
+let faceBox = null;
+let lastFaceTime = 0;
+
+let ready = false;
+let photo = null;
+
+let pieces = [];
+let solved = false;
+let counting = false;
+
+let processing = false;
+let lastFrame = 0;
+
+let pinch = false;
+let dragged = null;
+
+let offset = {x:0,y:0};
+
+let pointerId = null;
+let handControl = true;
+
+let animationId = null;
+let toastTimer = null;
+
+let faceScanTimer = null;
+
+/* ==========================================
+   SMALL HELPERS
+========================================== */
+
+function say(text){
+ message.textContent = text;
 }
-function setMode(message){
-  $("modePill").textContent = message;
+
+function toast(text){
+ const el = $("toast");
+
+ el.textContent = text;
+ el.classList.add("show");
+
+ clearTimeout(toastTimer);
+
+ toastTimer = setTimeout(()=>{
+  el.classList.remove("show");
+ },2200);
 }
-function toast(message){
-  const now=Date.now();
-  if(now-STATE.lastToast<700)return;
-  STATE.lastToast=now;
-  toastEl.textContent=message;
-  toastEl.classList.add("show");
-  setTimeout(()=>toastEl.classList.remove("show"),1700);
+
+function setLoadText(text){
+ $("loadText").textContent = text;
 }
-function showError(message){
-  errorBox.textContent=message;
-  $("spinner").style.display="none";
-  startBtn.disabled=false;
-  startBtn.textContent="إعادة المحاولة";
-  loadText.textContent="حصلت مشكلة أثناء التشغيل. راجع الرسالة وجرب تاني.";
+
+function setLoadError(text){
+ $("loadError").textContent = text;
 }
+
 function resizeCanvas(){
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  fx.width=Math.floor(innerWidth*dpr);
-  fx.height=Math.floor(innerHeight*dpr);
-  fx.style.width=innerWidth+"px";
-  fx.style.height=innerHeight+"px";
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+ const dpr = Math.min(window.devicePixelRatio || 1,2);
+
+ fx.width = Math.floor(innerWidth*dpr);
+ fx.height = Math.floor(innerHeight*dpr);
+
+ fx.style.width = innerWidth+"px";
+ fx.style.height = innerHeight+"px";
+
+ ctx.setTransform(dpr,0,0,dpr,0,0);
 }
+
 window.addEventListener("resize",resizeCanvas);
 resizeCanvas();
 
-function clearFx(){
-  ctx.clearRect(0,0,innerWidth,innerHeight);
+/* ==========================================
+   HACKER HUD EFFECTS
+========================================== */
+
+function drawFaceHUD(){
+
+ ctx.clearRect(0,0,innerWidth,innerHeight);
+
+ if(!faceBox || Date.now()-lastFaceTime>1200){
+
+  faceStatus.textContent = "SCANNING FACE...";
+  faceStatus.classList.remove("detected");
+
+  $("sys2").textContent = "FACE: SEARCHING";
+
+  return;
+ }
+
+ const W = innerWidth;
+ const H = innerHeight;
+
+ const x = (1-faceBox.centerX-faceBox.width/2)*W;
+ const y = (faceBox.centerY-faceBox.height/2)*H;
+ const w = faceBox.width*W;
+ const h = faceBox.height*H;
+
+ const color = "#00ff91";
+
+ ctx.save();
+
+ ctx.strokeStyle = color;
+ ctx.fillStyle = color;
+
+ ctx.lineWidth = 2;
+
+ ctx.shadowColor = color;
+ ctx.shadowBlur = 14;
+
+ const corner = Math.min(w,h)*.19;
+
+ // Face tracking corners
+ ctx.beginPath();
+
+ ctx.moveTo(x,y+corner);
+ ctx.lineTo(x,y);
+ ctx.lineTo(x+corner,y);
+
+ ctx.moveTo(x+w-corner,y);
+ ctx.lineTo(x+w,y);
+ ctx.lineTo(x+w,y+corner);
+
+ ctx.moveTo(x,y+h-corner);
+ ctx.lineTo(x,y+h);
+ ctx.lineTo(x+corner,y+h);
+
+ ctx.moveTo(x+w-corner,y+h);
+ ctx.lineTo(x+w,y+h);
+ ctx.lineTo(x+w,y+h-corner);
+
+ ctx.stroke();
+
+ // Face center cross
+ ctx.globalAlpha=.55;
+ ctx.lineWidth=1;
+
+ ctx.beginPath();
+
+ ctx.moveTo(x+w/2-12,y+h/2);
+ ctx.lineTo(x+w/2+12,y+h/2);
+
+ ctx.moveTo(x+w/2,y+h/2-12);
+ ctx.lineTo(x+w/2,y+h/2+12);
+
+ ctx.stroke();
+
+ // Horizontal scanner line
+ const scanY = y + ((Date.now()%1800)/1800)*h;
+
+ ctx.globalAlpha=.8;
+ ctx.lineWidth=1.5;
+
+ ctx.beginPath();
+ ctx.moveTo(x,scanY);
+ ctx.lineTo(x+w,scanY);
+ ctx.stroke();
+
+ // Face label
+ ctx.globalAlpha=1;
+ ctx.font="bold 11px monospace";
+ ctx.fillText("FACE DETECTED",x,y-12);
+
+ ctx.font="9px monospace";
+ ctx.fillText("TRACKING: ACTIVE",x,y+h+15);
+
+ // Tracking points
+ for(let i=0;i<4;i++){
+
+  const px = x+(i%2)*w;
+  const py = y+Math.floor(i/2)*h;
+
+  ctx.beginPath();
+  ctx.arc(px,py,3,0,Math.PI*2);
+  ctx.fill();
+ }
+
+ ctx.restore();
+
+ faceStatus.textContent = "● FACE DETECTED";
+ faceStatus.classList.add("detected");
+
+ $("sys2").textContent = "FACE: LOCKED";
 }
 
-async function openCamera(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    throw new Error("المتصفح لا يدعم الكاميرا هنا. افتح الصفحة من Chrome عبر localhost أو HTTPS، وليس file://");
-  }
-  const constraints=[
-    {audio:false,video:{facingMode:{ideal:"user"},width:{ideal:1280},height:{ideal:720}}},
-    {audio:false,video:{facingMode:"user"}},
-    {audio:false,video:true}
-  ];
-  let lastError=null;
-  for(const c of constraints){
-    try{
-      const stream=await navigator.mediaDevices.getUserMedia(c);
-      video.srcObject=stream;
-      await new Promise((resolve,reject)=>{
-        const timer=setTimeout(()=>reject(new Error("الكاميرا لم ترسل صورة خلال 10 ثوانٍ")),10000);
-        video.onloadedmetadata=()=>{clearTimeout(timer);resolve();};
-      });
-      await video.play();
-      STATE.camera=true;
-      return;
-    }catch(e){lastError=e;}
-  }
-  throw lastError||new Error("تعذر فتح الكاميرا");
+function drawGridHUD(){
+
+ const W = innerWidth;
+ const H = innerHeight;
+
+ ctx.save();
+
+ ctx.strokeStyle = "rgba(0,255,145,.09)";
+ ctx.lineWidth = 1;
+
+ for(let x=0;x<W;x+=42){
+
+  ctx.beginPath();
+  ctx.moveTo(x,0);
+  ctx.lineTo(x,H);
+  ctx.stroke();
+ }
+
+ for(let y=0;y<H;y+=42){
+
+  ctx.beginPath();
+  ctx.moveTo(0,y);
+  ctx.lineTo(W,y);
+  ctx.stroke();
+ }
+
+ // Moving scan band
+ const scanY = (Date.now()*.09)%H;
+
+ const gradient = ctx.createLinearGradient(
+  0,scanY-30,0,scanY+30
+ );
+
+ gradient.addColorStop(0,"rgba(0,255,145,0)");
+ gradient.addColorStop(.5,"rgba(0,255,145,.18)");
+ gradient.addColorStop(1,"rgba(0,255,145,0)");
+
+ ctx.fillStyle=gradient;
+ ctx.fillRect(0,scanY-30,W,60);
+
+ ctx.restore();
 }
 
-async function loadAI(){
-  if(typeof window.FaceDetection!=="function"){
-    throw new Error("مكتبة اكتشاف الوجه لم تُحمّل. تأكد من الإنترنت ثم أعد المحاولة.");
-  }
-  if(typeof window.Hands!=="function"){
-    throw new Error("مكتبة تتبع اليد لم تُحمّل. تأكد من الإنترنت ثم أعد المحاولة.");
-  }
-  STATE.faceDetector=new FaceDetection({
-    locateFile:(file)=>"https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/"+file
-  });
-  STATE.faceDetector.setOptions({
-    model:"short",
-    minDetectionConfidence:CONFIG.faceConfidence
-  });
-  STATE.faceDetector.onResults(onFaceResults);
+function drawHUD(){
 
-  STATE.handDetector=new Hands({
-    locateFile:(file)=>"https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/"+file
-  });
-  STATE.handDetector.setOptions({
-    maxNumHands:1,
-    modelComplexity:0,
-    minDetectionConfidence:CONFIG.handConfidence,
-    minTrackingConfidence:CONFIG.detectionConfidence
-  });
-  STATE.handDetector.onResults(onHandResults);
+ if(!ready || photo) return;
 
-  // Warm up models with the first decoded camera frame.
-  await STATE.faceDetector.send({image:video});
-  await STATE.handDetector.send({image:video});
-  STATE.models=true;
+ ctx.clearRect(0,0,innerWidth,innerHeight);
+
+ drawGridHUD();
+ drawFaceHUD();
 }
 
-async function startExperience(){
-  startBtn.disabled=true;
-  errorBox.textContent="";
-  $("spinner").style.display="block";
-  loadText.textContent="جاري طلب إذن الكاميرا...";
-  try{
-    await openCamera();
-    // Show the natural camera before applying any cyber overlays.
-    loading.classList.add("hidden");
-    setMode("LIVE CAMERA");
-    setStatus("الصورة الطبيعية شغالة — جاري تجهيز نظام الفحص");
-    await new Promise(r=>setTimeout(r,900));
-    loadText.textContent="جاري تحميل تحليل الوجه واليد...";
-    try{
-      await loadAI();
-      STATE.running=true;
-      STATE.scanning=true;
-      hud.classList.add("active");
-      gridOverlay.classList.add("on");
-      scanline.classList.add("run");
-      setMode("FACE SCAN");
-      setStatus("تم تشغيل النظام — خلي وشك واضح قدام الكاميرا");
-      requestAnimationFrame(processLoop);
-    }catch(aiError){
-      // Camera stays visible; report the exact missing AI dependency.
-      hud.classList.add("active");
-      loading.classList.add("hidden");
-      setMode("CAMERA / AI OFFLINE");
-      setStatus("الكاميرا شغالة، لكن تحليل الوجه لم يحمّل: "+aiError.message);
-      toast("تعذر تحميل مكتبات التحليل. تأكد من الإنترنت ثم أعد تحميل الصفحة.");
-    }
-  }catch(e){
-    showError((e&&e.message?e.message:String(e))+
-      "\n\nتأكد من السماح للكاميرا من إعدادات Chrome، وافتح الرابط من http://127.0.0.1:8080 أو HTTPS.");
-  }
-}
-startBtn.addEventListener("click",startExperience);
+function renderLoop(){
 
-function normalizedBoxToScreen(box){
-  // Preview is mirrored with CSS, so invert horizontal coordinates.
-  const x=(1-(box.xCenter+box.width/2))*innerWidth;
-  const y=(box.yCenter-box.height/2)*innerHeight;
-  return {x,y,w:box.width*innerWidth,h:box.height*innerHeight};
+ drawHUD();
+
+ animationId = requestAnimationFrame(renderLoop);
 }
+
+/* ==========================================
+   FACE DETECTION
+========================================== */
 
 function onFaceResults(results){
-  const detections=results.detections||[];
-  if(!detections.length){
-    STATE.face=null;
-    faceBox.style.display="none";
-    $("readB").textContent="FACE: SEARCHING";
-    return;
+
+ const detection = results.detections?.[0];
+
+ if(!detection){
+
+  faceBox = null;
+
+  if(!photo){
+   faceStatus.textContent = "SCANNING FACE...";
   }
-  const d=detections[0];
-  const box=d.boundingBox;
-  if(!box)return;
-  STATE.face={box,score:d.score&&d.score[0]?d.score[0]:0.8};
-  const p=normalizedBoxToScreen(box);
-  faceBox.style.display="block";
-  faceBox.style.left=p.x+"px";
-  faceBox.style.top=p.y+"px";
-  faceBox.style.width=p.w+"px";
-  faceBox.style.height=p.h+"px";
-  $("readB").textContent="FACE: "+Math.round(STATE.face.score*100)+"%";
-  if(!STATE.captured && !STATE.captureTimer){
-    STATE.lastFaceSeenAt=Date.now();
-    setStatus("تم تحديد الوجه — جاري المسح والتحليل");
-    setTimeout(()=>{
-      if(STATE.face&&!STATE.captured&&!STATE.captureTimer){
-        beginCountdown();
-      }
-    },1200);
-    STATE.captureTimer=true;
-  }
+
+  $("sys2").textContent = "FACE: SEARCHING";
+
+  return;
+ }
+
+ const b = detection.boundingBox;
+
+ faceBox = {
+  centerX:b.xCenter,
+  centerY:b.yCenter,
+  width:b.width,
+  height:b.height
+ };
+
+ lastFaceTime = Date.now();
+
+ $("sys1").textContent = "SYSTEM: ONLINE";
+ $("sys4").textContent = "SECURITY: ACTIVE";
+
 }
 
-function onHandResults(results){
-  const list=results.multiHandLandmarks||[];
-  if(!list.length){
-    STATE.hand=null;
-    pointerEl.style.display="none";
-    $("readC").textContent="HAND: WAIT";
-    return;
-  }
-  const landmarks=list[0];
-  STATE.hand=landmarks;
-  const index=landmarks[8];
-  const thumb=landmarks[4];
-  const x=(1-index.x)*innerWidth;
-  const y=index.y*innerHeight;
-  pointerEl.style.display="block";
-  pointerEl.style.left=x+"px";
-  pointerEl.style.top=y+"px";
-  const dx=index.x-thumb.x;
-  const dy=index.y-thumb.y;
-  const distance=Math.sqrt(dx*dx+dy*dy);
-  STATE.pinch=distance<CONFIG.minPinchDistance;
-  $("readC").textContent=STATE.pinch?"HAND: PINCH":"HAND: TRACKED";
-  if(STATE.game)handleHandPuzzle(x,y,STATE.pinch);
+/* ==========================================
+   CAPTURE PHOTO
+========================================== */
+
+function capturePhoto(){
+
+ if(!video.videoWidth || !video.videoHeight){
+  throw new Error("الكاميرا غير جاهزة");
+ }
+
+ const W = video.videoWidth;
+ const H = video.videoHeight;
+
+ const c = document.createElement("canvas");
+
+ c.width = 600;
+ c.height = 600;
+
+ const g = c.getContext("2d",{
+  willReadFrequently:true
+ });
+
+ let sx,sy,size;
+
+ if(faceBox){
+
+  const cx = (1-faceBox.centerX)*W;
+  const cy = faceBox.centerY*H;
+
+  size = Math.max(
+   faceBox.width*W,
+   faceBox.height*H
+  )*1.65;
+
+  size = Math.min(size,W,H);
+
+  sx = Math.max(0,Math.min(W-size,cx-size/2));
+  sy = Math.max(0,Math.min(H-size,cy-size/2));
+
+ }else{
+
+  size = Math.min(W,H)*.85;
+
+  sx = (W-size)/2;
+  sy = (H-size)/2;
+ }
+
+ // Mirror selfie image
+ g.save();
+
+ g.translate(600,0);
+ g.scale(-1,1);
+
+ g.drawImage(
+  video,
+  sx,sy,size,size,
+  0,0,600,600
+ );
+
+ g.restore();
+
+ // Convert to grayscale
+ const img = g.getImageData(0,0,600,600);
+ const d = img.data;
+
+ for(let i=0;i<d.length;i+=4){
+
+  const gray =
+   .299*d[i]+
+   .587*d[i+1]+
+   .114*d[i+2];
+
+  d[i]=gray;
+  d[i+1]=gray;
+  d[i+2]=gray;
+ }
+
+ g.putImageData(img,0,0);
+
+ return c.toDataURL("image/jpeg",.92);
 }
 
-async function processLoop(timestamp){
-  if(!STATE.running)return;
-  if(!STATE.loopBusy && video.readyState>=2){
-    STATE.loopBusy=true;
-    try{
-      if(timestamp-STATE.lastFaceProcessAt>CONFIG.faceInterval){
-        STATE.lastFaceProcessAt=timestamp;
-        await STATE.faceDetector.send({image:video});
-      }
-      if(timestamp-STATE.lastHandAt>CONFIG.handInterval){
-        STATE.lastHandAt=timestamp;
-        await STATE.handDetector.send({image:video});
-      }
-    }catch(e){
-      console.warn("tracking frame",e);
-    }finally{
-      STATE.loopBusy=false;
-    }
-  }
-  drawCyberLayer();
-  updateFps(timestamp);
-  STATE.raf=requestAnimationFrame(processLoop);
-}
+/* ==========================================
+   COUNTDOWN
+========================================== */
 
-function updateFps(t){
-  STATE.frameCount++;
-  if(!STATE.fpsTime)STATE.fpsTime=t;
-  if(t-STATE.fpsTime>=1000){
-    STATE.fps=Math.round(STATE.frameCount*1000/(t-STATE.fpsTime));
-    STATE.frameCount=0;
-    STATE.fpsTime=t;
-    $("readA").textContent="SYS: ONLINE / "+STATE.fps+" FPS";
-  }
-}
+function startCapture(){
 
-function drawCyberLayer(){
-  clearFx();
-  if(!STATE.scanning||STATE.game)return;
-  const w=innerWidth,h=innerHeight;
-  // Soft green face illumination, HUD grid and corner brackets.
-  if(STATE.face){
-    const p=normalizedBoxToScreen(STATE.face.box);
-    ctx.save();
-    ctx.strokeStyle="rgba(57,255,136,.7)";
-    ctx.lineWidth=1;
-    ctx.setLineDash([5,7]);
-    ctx.strokeRect(p.x-8,p.y-8,p.w+16,p.h+16);
-    ctx.setLineDash([]);
-    ctx.fillStyle="rgba(20,255,120,.055)";
-    ctx.fillRect(p.x,p.y,p.w,p.h);
-    ctx.font="11px monospace";
-    ctx.fillStyle="#8dffba";
-    ctx.fillText("SUBJECT LOCKED",Math.max(8,p.x),Math.max(18,p.y-12));
-    // Animated targeting brackets.
-    const s=12;
-    ctx.lineWidth=2;
-    ctx.strokeStyle="#39ff88";
-    const corners=[
-      [p.x,p.y,1,1],[p.x+p.w,p.y,-1,1],
-      [p.x,p.y+p.h,1,-1],[p.x+p.w,p.y+p.h,-1,-1]
-    ];
-    for(const [x,y,sx,sy] of corners){
-      ctx.beginPath();ctx.moveTo(x+sx*s,y);ctx.lineTo(x,y);ctx.lineTo(x,y+sy*s);ctx.stroke();
-    }
-    ctx.restore();
-  }
-  // Scanning grid only while the scanner is active.
-  const t=Date.now()/1000;
-  ctx.save();
-  ctx.strokeStyle="rgba(40,255,130,.09)";
-  ctx.lineWidth=1;
-  for(let x=0;x<w;x+=42){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
-  for(let y=0;y<h;y+=42){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
-  const scanY=(t*95)%(h*.72)+h*.14;
-  const grad=ctx.createLinearGradient(0,scanY-20,0,scanY+20);
-  grad.addColorStop(0,"rgba(57,255,136,0)");
-  grad.addColorStop(.5,"rgba(57,255,136,.18)");
-  grad.addColorStop(1,"rgba(57,255,136,0)");
-  ctx.fillStyle=grad;ctx.fillRect(0,scanY-20,w,40);
-  ctx.restore();
-}
+ if(!ready){
+  toast("الكاميرا لم تعمل بعد");
+  return;
+ }
 
-async function beginCountdown(){
-  if(STATE.captured||STATE.game||!STATE.face)return;
-  STATE.captured=true;
-  STATE.captureTimer=null;
-  let n=CONFIG.countdown;
-  countdownEl.classList.add("show");
-  setStatus("جاري تثبيت الصورة...");
-  const tick=()=>{
-    countdownEl.textContent=n>0?String(n):"SCAN";
-    if(n===0){
-      setTimeout(()=>{
-        countdownEl.classList.remove("show");
-        captureFace();
-      },450);
-      return;
-    }
-    n--;
-    setTimeout(tick,850);
-  };
-  tick();
-}
+ if(counting) return;
 
-function captureFace(){
-  if(!video.videoWidth||!video.videoHeight){
-    STATE.captured=false;toast("الكاميرا لم تجهز بعد");return;
-  }
-  const b=STATE.face&&STATE.face.box;
-  // If face detection was lost at the exact capture frame, use a centered crop.
-  const vw=video.videoWidth,vh=video.videoHeight;
-  let sx=0,sy=0,sw=vw,sh=vh;
-  if(b){
-    const pad=0.28;
-    const bw=Math.min(1,b.width*(1+pad));
-    const bh=Math.min(1,b.height*(1+pad));
-    const cx=b.xCenter,cy=b.yCenter;
-    const aspect=1;
-    let side=Math.min(vw*bw,vh*bh);
-    side=Math.max(Math.min(vw,vh)*.34,side);
-    sw=sh=Math.min(side,Math.min(vw,vh));
-    sx=Math.max(0,Math.min(vw-sw,(cx*vw)-sw/2));
-    sy=Math.max(0,Math.min(vh-sh,(cy*vh)-sh/2));
+ if(!faceBox || Date.now()-lastFaceTime>1200){
+  toast("خلي وجهك ظاهر أمام الكاميرا");
+  return;
+ }
+
+ counting = true;
+
+ let n=3;
+
+ countEl.style.display="grid";
+ countEl.textContent=n;
+
+ say("جاري تثبيت الوجه والتقاط الصورة");
+
+ const timer = setInterval(()=>{
+
+  n--;
+
+  if(n>0){
+
+   countEl.textContent=n;
+
   }else{
-    sw=sh=Math.min(vw,vh)*.72;
-    sx=(vw-sw)/2;sy=(vh-sh)/2;
+
+   clearInterval(timer);
+
+   countEl.style.display="none";
+   counting=false;
+
+   try{
+
+    photo=capturePhoto();
+
+    faceBox=null;
+
+    $("grid").classList.remove("active");
+
+    board.classList.add("visible");
+
+    buildPuzzle();
+
+    say("اسحب القطع إلى أماكنها الصحيحة");
+
+    faceStatus.textContent="PUZZLE MODE";
+
+    $("sys2").textContent="FACE: CAPTURED";
+
+   }catch(e){
+
+    toast(e.message);
+    say(e.message);
+   }
   }
-  const c=document.createElement("canvas");
-  c.width=900;c.height=900;
-  const cctx=c.getContext("2d");
-  // Selfie preview and puzzle should have the same mirrored orientation.
-  cctx.translate(c.width,0);
-  cctx.scale(-1,1);
-  cctx.drawImage(video,sx,sy,sw,sh,0,0,c.width,c.height);
-  STATE.faceCanvas=c;
-  STATE.faceImage=c;
-  flashEl.classList.remove("hit");
-  void flashEl.offsetWidth;
-  flashEl.classList.add("hit");
-  setTimeout(buildPuzzle,400);
+
+ },850);
 }
+
+/* ==========================================
+   PUZZLE DIMENSIONS
+========================================== */
+
+function dimensions(){
+
+ const r=board.getBoundingClientRect();
+
+ return {
+  rect:r,
+  pw:r.width/GRID,
+  ph:r.height/GRID
+ };
+}
+
+/* ==========================================
+   CREATE PUZZLE
+========================================== */
 
 function buildPuzzle(){
-  if(!STATE.faceCanvas)return;
-  STATE.running=false;
-  STATE.scanning=false;
-  hud.classList.remove("active");
-  gridOverlay.classList.remove("on");
-  scanline.classList.remove("run");
-  faceBox.style.display="none";
-  gameEl.classList.add("show");
-  STATE.game=true;
-  setMode("PUZZLE MODE");
-  setStatus("حرّك القطع بإشارة القرص بين الإبهام والسبابة");
-  createTiles();
-  drawCyberLayer();
-}
 
-function createTiles(){
-  boardEl.innerHTML="";
-  STATE.tiles=[];
-  const count=CONFIG.grid*CONFIG.grid;
-  const order=Array.from({length:count},(_,i)=>i);
-  // Fisher-Yates shuffle, avoiding a solved board.
+ if(!photo){
+  toast("لم يتم التقاط صورة الوجه");
+  return;
+ }
+
+ piecesLayer.innerHTML="";
+ pieces=[];
+
+ solved=false;
+
+ board.classList.remove("done");
+
+ saveBtn.disabled=true;
+
+ const d=dimensions();
+
+ let order=Array.from(
+  {length:TOTAL},
+  (_,i)=>i
+ );
+
+ // Shuffle puzzle
+ do{
+
   for(let i=order.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [order[i],order[j]]=[order[j],order[i]];
+
+   const j=Math.floor(Math.random()*(i+1));
+
+   [order[i],order[j]]=[order[j],order[i]];
   }
-  if(order.every((v,i)=>v===i)) [order[0],order[1]]=[order[1],order[0]];
-  order.forEach((home,slot)=>{
-    const tile=document.createElement("div");
-    tile.className="tile";
-    tile.dataset.n=String(home+1).padStart(2,"0");
-    tile.dataset.slot=String(slot);
-    const cv=document.createElement("canvas");
-    cv.width=300;cv.height=300;
-    tile.appendChild(cv);
-    drawTile(cv,home);
-    tile.addEventListener("pointerdown",e=>onTileTap(e,slot));
-    boardEl.appendChild(tile);
-    STATE.tiles.push({home,slot,element:tile,canvas:cv});
+
+ }while(order.every((v,i)=>v===i));
+
+ order.forEach((correct,slot)=>{
+
+  const col=slot%GRID;
+  const row=Math.floor(slot/GRID);
+
+  const el=document.createElement("div");
+
+  el.className="piece";
+
+  el.style.width=d.pw+"px";
+  el.style.height=d.ph+"px";
+
+  const x=d.rect.left+col*d.pw;
+  const y=d.rect.top+row*d.ph;
+
+  el.style.left=x+"px";
+  el.style.top=y+"px";
+
+  el.style.backgroundImage=`url("${photo}")`;
+
+  el.style.backgroundSize=
+   `${d.rect.width}px ${d.rect.height}px`;
+
+  const cc=correct%GRID;
+  const cr=Math.floor(correct/GRID);
+
+  el.style.backgroundPosition=
+   `${-cc*d.pw}px ${-cr*d.ph}px`;
+
+  const p={
+   el,
+   correct,
+   x,
+   y,
+   w:d.pw,
+   h:d.ph
+  };
+
+  el.addEventListener(
+   "pointerdown",
+   e=>pointerStart(e,p)
+  );
+
+  piecesLayer.appendChild(el);
+
+  pieces.push(p);
+ });
+
+ updateProgress();
+
+ $("sys3").textContent="HAND: READY";
+
+ // Start hand tracking after capture
+ toast("تم إنشاء البازل! ابدأ بتحريك القطع");
+}
+
+/* ==========================================
+   TARGET POSITION
+========================================== */
+
+function target(p){
+
+ const d=dimensions();
+
+ return {
+  x:d.rect.left+(p.correct%GRID)*d.pw,
+  y:d.rect.top+Math.floor(p.correct/GRID)*d.ph
+ };
+}
+
+function near(a,b,t){
+
+ return Math.abs(a.x-b.x)<t &&
+        Math.abs(a.y-b.y)<t;
+}
+
+function place(p,x,y){
+
+ p.x=x;
+ p.y=y;
+
+ p.el.style.left=x+"px";
+ p.el.style.top=y+"px";
+}
+
+function snap(p){
+
+ const t=target(p);
+
+ if(near(p,t,Math.min(32,p.w*.25))){
+
+  place(p,t.x,t.y);
+
+  p.el.classList.add("correct");
+
+  return true;
+ }
+
+ p.el.classList.remove("correct");
+
+ return false;
+}
+
+/* ==========================================
+   DRAG PIECES
+========================================== */
+
+function beginDrag(p,x,y){
+
+ if(!p || dragged) return;
+
+ if(p.el.classList.contains("correct")) return;
+
+ dragged=p;
+
+ const r=p.el.getBoundingClientRect();
+
+ offset={
+  x:x-r.left,
+  y:y-r.top
+ };
+
+ p.el.classList.add("drag");
+}
+
+function moveDrag(x,y){
+
+ if(!dragged) return;
+
+ place(
+  dragged,
+  x-offset.x,
+  y-offset.y
+ );
+}
+
+function endDrag(){
+
+ if(!dragged) return;
+
+ const p=dragged;
+
+ p.el.classList.remove("drag");
+
+ snap(p);
+
+ dragged=null;
+
+ updateProgress();
+}
+
+function findPiece(x,y){
+
+ for(let i=pieces.length-1;i>=0;i--){
+
+  const p=pieces[i];
+
+  if(p.el.classList.contains("correct")) continue;
+
+  const r=p.el.getBoundingClientRect();
+
+  if(
+   x>=r.left && x<=r.right &&
+   y>=r.top && y<=r.bottom
+  ){
+   return p;
+  }
+ }
+
+ return null;
+}
+
+/* ==========================================
+   TOUCH AND MOUSE
+========================================== */
+
+function pointerStart(e,p){
+
+ if(!photo || dragged || pointerId!==null) return;
+
+ if(p.el.classList.contains("correct")) return;
+
+ e.preventDefault();
+
+ pointerId=e.pointerId;
+
+ handControl=false;
+
+ beginDrag(p,e.clientX,e.clientY);
+
+ try{
+  p.el.setPointerCapture(e.pointerId);
+ }catch(err){}
+}
+
+window.addEventListener("pointermove",e=>{
+
+ if(pointerId!==e.pointerId) return;
+
+ moveDrag(e.clientX,e.clientY);
+
+});
+
+function pointerFinish(e){
+
+ if(pointerId!==e.pointerId) return;
+
+ pointerId=null;
+
+ endDrag();
+
+ handControl=true;
+}
+
+window.addEventListener("pointerup",pointerFinish);
+window.addEventListener("pointercancel",pointerFinish);
+
+/* ==========================================
+   HAND TRACKING
+========================================== */
+
+function onHandResults(results){
+
+ const lm=results.multiHandLandmarks?.[0];
+
+ if(!lm){
+
+  dot.style.display="none";
+
+  if(pinch && dragged && handControl){
+   endDrag();
+  }
+
+  pinch=false;
+
+  $("sys3").textContent="HAND: SEARCHING";
+
+  return;
+ }
+
+ const thumb=lm[4];
+ const index=lm[8];
+
+ const dist=Math.hypot(
+  thumb.x-index.x,
+  thumb.y-index.y
+ );
+
+ const isPinch=dist<.052;
+
+ const x=(1-(thumb.x+index.x)/2)*innerWidth;
+ const y=((thumb.y+index.y)/2)*innerHeight;
+
+ dot.style.display="block";
+ dot.style.left=x+"px";
+ dot.style.top=y+"px";
+
+ dot.classList.toggle("pinching",isPinch);
+
+ $("sys3").textContent=isPinch
+  ?"HAND: PINCH ACTIVE"
+  :"HAND: TRACKED";
+
+ if(!photo || !handControl){
+  pinch=isPinch;
+  return;
+ }
+
+ if(isPinch && !pinch && !dragged){
+
+  const p=findPiece(x,y);
+
+  if(p){
+   beginDrag(p,x,y);
+  }
+ }
+
+ if(isPinch && dragged){
+  moveDrag(x,y);
+ }
+
+ if(!isPinch && pinch && dragged){
+  endDrag();
+ }
+
+ pinch=isPinch;
+}
+
+/* ==========================================
+   PROGRESS AND WIN
+========================================== */
+
+function updateProgress(){
+
+ const n=pieces.filter(
+  p=>p.el.classList.contains("correct")
+ ).length;
+
+ progress.textContent=`${n} / ${TOTAL}`;
+
+ if(n===TOTAL && !solved){
+
+  solved=true;
+
+  board.classList.add("done");
+
+  say("اكتملت الصورة بنجاح!");
+
+  saveBtn.disabled=false;
+
+  $("success").classList.add("show");
+
+  celebrate();
+ }
+}
+
+/* ==========================================
+   CELEBRATION
+========================================== */
+
+function celebrate(){
+
+ const colors=[
+  "#00ff91",
+  "#ffd700",
+  "#00d9ff",
+  "#ffffff"
+ ];
+
+ for(let i=0;i<75;i++){
+
+  const el=document.createElement("div");
+
+  el.style.position="fixed";
+  el.style.width="8px";
+  el.style.height="8px";
+  el.style.left="50%";
+  el.style.top="45%";
+  el.style.background=colors[i%colors.length];
+  el.style.zIndex="180";
+  el.style.pointerEvents="none";
+
+  document.body.appendChild(el);
+
+  const a=Math.random()*Math.PI*2;
+  const d=100+Math.random()*250;
+
+  const anim=el.animate([
+
+   {transform:"translate(0,0)",opacity:1},
+
+   {
+    transform:`translate(
+     ${Math.cos(a)*d}px,
+     ${Math.sin(a)*d+160}px
+    ) rotate(720deg)`,
+    opacity:0
+   }
+
+  ],{
+   duration:1300+Math.random()*600,
+   easing:"ease-out"
   });
-  STATE.moves=0;
-  updatePuzzleProgress();
-  $("moves").textContent="MOVES: 0";
+
+  anim.onfinish=()=>el.remove();
+ }
+
+ if(navigator.vibrate){
+  navigator.vibrate([100,50,100]);
+ }
 }
 
-function drawTile(canvas,home){
-  const c=canvas.getContext("2d");
-  const n=CONFIG.grid;
-  const col=home%n,row=Math.floor(home/n);
-  const sw=STATE.faceCanvas.width/n,sh=STATE.faceCanvas.height/n;
-  c.clearRect(0,0,canvas.width,canvas.height);
-  c.drawImage(STATE.faceCanvas,col*sw,row*sh,sw,sh,0,0,canvas.width,canvas.height);
-  c.strokeStyle="rgba(57,255,136,.25)";
-  c.lineWidth=2;c.strokeRect(1,1,canvas.width-2,canvas.height-2);
+/* ==========================================
+   SAVE PHOTO
+========================================== */
+
+function saveImage(){
+
+ if(!solved || !photo){
+  toast("أكملي البازل أولاً");
+  return;
+ }
+
+ const a=document.createElement("a");
+
+ a.href=photo;
+ a.download="PUZZLE-CAM.jpg";
+
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+
+ toast("تم تجهيز الصورة للحفظ");
 }
 
-function onTileTap(event,slot){
-  if(!STATE.game)return;
-  event.preventDefault();
-  const tile=STATE.tiles.find(t=>t.slot===slot);
-  if(!tile)return;
-  if(STATE.selected===null){
-    STATE.selected=slot;
-    tile.element.classList.add("selected");
-    toast("اختاري القطعة الثانية للتبديل أو اسحبي باليد");
-  }else if(STATE.selected===slot){
-    tile.element.classList.remove("selected");
-    STATE.selected=null;
-  }else{
-    swapSlots(STATE.selected,slot);
-    STATE.selected=null;
+/* ==========================================
+   RESET GAME
+========================================== */
+
+function resetGame(){
+
+ if(dragged){
+  dragged.el.classList.remove("drag");
+  dragged=null;
+ }
+
+ photo=null;
+ pieces=[];
+ solved=false;
+ pinch=false;
+
+ piecesLayer.innerHTML="";
+
+ board.classList.remove("visible","done");
+
+ $("success").classList.remove("show");
+
+ $("grid").classList.add("active");
+
+ saveBtn.disabled=true;
+
+ progress.textContent="0 / 9";
+
+ faceStatus.textContent="SCANNING FACE...";
+
+ $("sys2").textContent="FACE: SEARCHING";
+ $("sys3").textContent="HAND: STANDBY";
+
+ say("انظري إلى الكاميرا لاكتشاف الوجه");
+}
+
+/* ==========================================
+   FACE AND HAND MODELS
+========================================== */
+
+async function initializeModels(){
+
+ if(typeof FaceDetection==="undefined"){
+  throw new Error("مكتبة اكتشاف الوجه لم يتم تحميلها. افحصي الإنترنت.");
+ }
+
+ if(typeof Hands==="undefined"){
+  throw new Error("مكتبة تتبع اليد لم يتم تحميلها. افحصي الإنترنت.");
+ }
+
+ faceDetector=new FaceDetection({
+  locateFile:file=>
+   `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+ });
+
+ faceDetector.setOptions({
+  model:"short",
+  minDetectionConfidence:.55
+ });
+
+ faceDetector.onResults(onFaceResults);
+
+ handDetector=new Hands({
+  locateFile:file=>
+   `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+ });
+
+ handDetector.setOptions({
+  maxNumHands:1,
+  modelComplexity:0,
+  minDetectionConfidence:.6,
+  minTrackingConfidence:.55
+ });
+
+ handDetector.onResults(onHandResults);
+}
+
+/* ==========================================
+   CAMERA INITIALIZATION
+========================================== */
+
+async function initializeCamera(){
+
+ try{
+
+  setLoadText("LOADING AI SYSTEM...");
+  setLoadError("");
+
+  if(!navigator.mediaDevices?.getUserMedia){
+   throw new Error("الكاميرا تحتاج HTTPS أو localhost.");
   }
+
+  // Load models
+  await initializeModels();
+
+  setLoadText("REQUESTING CAMERA PERMISSION...");
+
+  // Camera starts automatically on page load.
+  stream=await navigator.mediaDevices.getUserMedia({
+
+   audio:false,
+
+   video:{
+    facingMode:"user",
+    width:{ideal:640},
+    height:{ideal:480},
+    frameRate:{ideal:24,max:30}
+   }
+
+  });
+
+  video.srcObject=stream;
+
+  await new Promise((resolve,reject)=>{
+
+   if(video.readyState>=2){
+    resolve();
+    return;
+   }
+
+   const timeout=setTimeout(()=>{
+    reject(new Error("انتهى وقت انتظار الكاميرا."));
+   },12000);
+
+   video.onloadedmetadata=()=>{
+    clearTimeout(timeout);
+    resolve();
+   };
+
+   video.onerror=()=>{
+    clearTimeout(timeout);
+    reject(new Error("تعذر قراءة فيديو الكاميرا."));
+   };
+
+  });
+
+  await video.play();
+
+  ready=true;
+
+  loading.classList.add("hide");
+
+  $("grid").classList.add("active");
+
+  say("انظري إلى الكاميرا لاكتشاف الوجه");
+
+  $("sys1").textContent="SYSTEM: ONLINE";
+
+  $("sys4").textContent="SECURITY: ACTIVE";
+
+  renderLoop();
+
+  processLoop();
+
+ }catch(e){
+
+  console.error(e);
+
+  loading.classList.remove("hide");
+
+  setLoadText("CAMERA / AI ERROR");
+
+  setLoadError(
+   e.message+
+   "\n\nاسمحي للكاميرا من إعدادات Chrome وافتحي الصفحة عبر localhost أو HTTPS."
+  );
+
+  say("تحققي من إذن الكاميرا والإنترنت");
+
+  $("sys1").textContent="SYSTEM: ERROR";
+ }
 }
 
-function swapSlots(a,b){
-  const ta=STATE.tiles.find(t=>t.slot===a);
-  const tb=STATE.tiles.find(t=>t.slot===b);
-  if(!ta||!tb)return;
-  const temp=ta.home;ta.home=tb.home;tb.home=temp;
-  drawTile(ta.canvas,ta.home);drawTile(tb.canvas,tb.home);
-  ta.element.dataset.n=String(ta.home+1).padStart(2,"0");
-  tb.element.dataset.n=String(tb.home+1).padStart(2,"0");
-  ta.element.classList.remove("selected");tb.element.classList.remove("selected");
-  STATE.moves++;
-  $("moves").textContent="MOVES: "+STATE.moves;
-  updatePuzzleProgress();
-  if(isSolved())showWin();
-}
+/* ==========================================
+   FRAME PROCESSING
+========================================== */
 
-function isSolved(){
-  return STATE.tiles.every(t=>t.home===t.slot);
-}
-function updatePuzzleProgress(){
-  const correct=STATE.tiles.filter(t=>t.home===t.slot).length;
-  $("progressFill").style.width=(correct/STATE.tiles.length*100)+"%";
-}
-function showWin(){
-  $("win").classList.add("show");
-  setStatus("اكتمل البازل");
-}
+async function processLoop(){
 
-function handleHandPuzzle(x,y,pinching){
-  if(!STATE.game)return;
-  const boardRect=boardEl.getBoundingClientRect();
-  const inside=x>=boardRect.left&&x<=boardRect.right&&y>=boardRect.top&&y<=boardRect.bottom;
-  if(pinching&&!STATE.lastPinch&&inside){
-    const col=Math.min(2,Math.max(0,Math.floor((x-boardRect.left)/boardRect.width*3)));
-    const row=Math.min(2,Math.max(0,Math.floor((y-boardRect.top)/boardRect.height*3)));
-    const slot=row*3+col;
-    if(STATE.drag===null){
-      STATE.drag=slot;
-      STATE.tiles.find(t=>t.slot===slot)?.element.classList.add("selected");
-    }else{
-      swapSlots(STATE.drag,slot);
-      STATE.drag=null;
-    }
+ if(!ready) return;
+
+ const now=performance.now();
+
+ if(
+  !processing &&
+  video.readyState>=2 &&
+  now-lastFrame>110
+ ){
+
+  processing=true;
+  lastFrame=now;
+
+  try{
+
+   // Face detection
+   await faceDetector.send({
+    image:video
+   });
+
+   // Hand detection runs only during puzzle mode.
+   if(photo){
+
+    await handDetector.send({
+     image:video
+    });
+
+   }else{
+
+    dot.style.display="none";
+   }
+
+  }catch(e){
+
+   console.warn("AI PROCESSING:",e);
+
+  }finally{
+
+   processing=false;
   }
-  if(!pinching&&STATE.lastPinch&&STATE.drag!==null){
-    STATE.tiles.find(t=>t.slot===STATE.drag)?.element.classList.remove("selected");
-    STATE.drag=null;
-  }
-  STATE.lastPinch=pinching;
+ }
+
+ setTimeout(processLoop,25);
 }
 
-$("backBtn").addEventListener("click",()=>{
-  gameEl.classList.remove("show");
-  STATE.game=false;
-  STATE.captured=false;
-  STATE.captureTimer=null;
-  STATE.scanning=true;
-  STATE.running=true;
-  hud.classList.add("active");
-  gridOverlay.classList.add("on");
-  scanline.classList.add("run");
-  setMode("FACE SCAN");
-  setStatus("رجعنا للكاميرا — استعدي للمسح التالي");
-  requestAnimationFrame(processLoop);
+/* ==========================================
+   BUTTON EVENTS
+========================================== */
+
+$("start").addEventListener(
+ "click",
+ startCapture
+);
+
+$("save").addEventListener(
+ "click",
+ saveImage
+);
+
+$("reset").addEventListener(
+ "click",
+ resetGame
+);
+
+/* ==========================================
+   PAGE CLEANUP
+========================================== */
+
+window.addEventListener("pagehide",()=>{
+
+ ready=false;
+
+ if(animationId){
+  cancelAnimationFrame(animationId);
+ }
+
+ if(stream){
+
+  stream.getTracks().forEach(
+   track=>track.stop()
+  );
+ }
+
+ try{
+
+  faceDetector?.close();
+  handDetector?.close();
+
+ }catch(e){}
 });
-$("shuffleBtn").addEventListener("click",()=>{
-  createTiles();toast("تم خلط القطع");
-});
-$("againBtn").addEventListener("click",()=>{
-  $("win").classList.remove("show");
-  createTiles();
-});
-document.addEventListener("visibilitychange",()=>{
-  if(document.hidden&&STATE.camera){
-    // Stop processing in background to reduce heat and battery use.
-    cancelAnimationFrame(STATE.raf);
-  }else if(!document.hidden&&STATE.running){
-    requestAnimationFrame(processLoop);
-  }
-});
-window.addEventListener("beforeunload",()=>{
-  const stream=video.srcObject;
-  if(stream)stream.getTracks().forEach(track=>track.stop());
-});
 
-/* =========================================================
-   Diagnostics and graceful recovery
-   ========================================================= */
-function explainEnvironment(){
-  if(location.protocol==="file:"){
-    return "ملاحظة: افتح الملف من localhost أو HTTPS؛ المتصفح يمنع الكاميرا عادةً من file://";
-  }
-  if(!window.isSecureContext){
-    return "تحذير: الصفحة ليست في سياق آمن. استخدم localhost أو HTTPS.";
-  }
-  return "بيئة المتصفح جاهزة لطلب إذن الكاميرا.";
-}
-console.info("PUZZLE CAM:",explainEnvironment());
-$("readA").textContent="SYS: READY";
+/* ==========================================
+   START APP AUTOMATICALLY
+========================================== */
+
+// No camera start button is needed.
+// Chrome will request permission when the page opens.
+initializeCamera();
+
 </script>
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: تشغيل المشروع من Termux -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فتح الصفحة على localhost -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: السماح بإذن الكاميرا في Chrome -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: التأكد من اتصال الإنترنت لتحميل MediaPipe -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم مرحلة الكاميرا الطبيعية -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم مرحلة تحديد الوجه -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم خطوط المسح الخضراء -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم العد التنازلي والتقاط الوجه -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم قص مربع الوجه -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم تقسيم الصورة إلى تسع قطع -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم خلط القطع -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم السحب بإشارة القرص -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: فهم التبديل باللمس عند تعذر تتبع اليد -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: حل مشكلة الشاشة السوداء -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: حل مشكلة عدم ظهور إذن الكاميرا -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: حل مشكلة عدم تحميل مكتبة الوجه -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: حل مشكلة عدم تحميل مكتبة اليد -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: تقليل استهلاك المعالج -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: تغيير حساسية اكتشاف الوجه -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: تغيير سرعة تحديث تتبع اليد -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: تغيير عدد صفوف وأعمدة البازل -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: اختبار الواجهة على الهاتف -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: اختبار الواجهة على شاشة لوحية -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: إيقاف الكاميرا عند مغادرة الصفحة -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-
-  <!-- ===================================================== -->
-  <!-- دليل المطور: ملاحظات الخصوصية والمعالجة المحلية -->
-  <!-- هذا القسم توثيقي ولا يغيّر سلوك الصفحة عند التشغيل. -->
-  <!-- احتفظ بهذا الملف كملف HTML واحد عند النقل إلى Termux. -->
-  <!-- ===================================================== -->
-  <!-- ملاحظة تشغيل 001: تأكد من تثبيت Python في Termux قبل تشغيل الخادم المحلي. -->
-  <!-- ملاحظة تشغيل 002: استخدم مجلد المشروع نفسه عند تنفيذ أمر تشغيل الخادم. -->
-  <!-- ملاحظة تشغيل 003: لا تغلق جلسة Termux التي تشغّل خادم HTTP أثناء الاختبار. -->
-  <!-- ملاحظة تشغيل 004: افتح العنوان المحلي في Chrome على الجهاز نفسه. -->
-  <!-- ملاحظة تشغيل 005: لا تستخدم عارض الملفات الداخلي لفتح الصفحة مباشرة. -->
-  <!-- ملاحظة تشغيل 006: عند ظهور نافذة الإذن اختر السماح أثناء استخدام الموقع. -->
-  <!-- ملاحظة تشغيل 007: إذا رفضت الإذن سابقاً افتح إعدادات الموقع في Chrome. -->
-  <!-- ملاحظة تشغيل 008: تأكد من أن الكاميرا غير مستخدمة حصرياً بواسطة تطبيق آخر. -->
-  <!-- ملاحظة تشغيل 009: أغلق تطبيقات الكاميرا الأخرى قبل بدء التجربة. -->
-  <!-- ملاحظة تشغيل 010: تحقق من اتصال الإنترنت عند تحميل مكتبات MediaPipe. -->
-  <!-- ملاحظة تشغيل 011: أعد تحميل الصفحة بعد التأكد من اتصال الإنترنت. -->
-  <!-- ملاحظة تشغيل 012: ابدأ الاختبار بإضاءة أمامية جيدة للوجه. -->
-  <!-- ملاحظة تشغيل 013: اجعل الوجه في منتصف إطار الكاميرا. -->
-  <!-- ملاحظة تشغيل 014: ابتعد قليلاً إذا كان الوجه قريباً جداً من العدسة. -->
-  <!-- ملاحظة تشغيل 015: تجنب الإضاءة الخلفية القوية خلف الرأس. -->
-  <!-- ملاحظة تشغيل 016: انتظر حتى يظهر إطار التحديد الأخضر حول الوجه. -->
-  <!-- ملاحظة تشغيل 017: لا تحرك الجهاز أثناء العد التنازلي. -->
-  <!-- ملاحظة تشغيل 018: تظهر صورة الوجه بعد انتهاء العد التنازلي. -->
-  <!-- ملاحظة تشغيل 019: تُقسم الصورة الملتقطة إلى شبكة ثلاثة في ثلاثة. -->
-  <!-- ملاحظة تشغيل 020: رقم القطعة الظاهر هو رقم موضعها الأصلي. -->
-  <!-- ملاحظة تشغيل 021: الهدف إعادة كل قطعة إلى موضعها الصحيح. -->
-  <!-- ملاحظة تشغيل 022: يمكن استخدام اللمس لتحديد قطعتين وتبديلهما. -->
-  <!-- ملاحظة تشغيل 023: يمكن استخدام القرص بين الإبهام والسبابة للتبديل. -->
-  <!-- ملاحظة تشغيل 024: تتبع اليد يحتاج أن تكون اليد ظاهرة كاملة نسبياً. -->
-  <!-- ملاحظة تشغيل 025: ضع اليد أمام الكاميرا داخل مجال الرؤية. -->
-  <!-- ملاحظة تشغيل 026: إذا تعذر تتبع اليد استخدم طريقة اللمس البديلة. -->
-  <!-- ملاحظة تشغيل 027: زر الخلط يعيد توزيع القطع عشوائياً. -->
-  <!-- ملاحظة تشغيل 028: زر الرجوع يعيدك إلى عرض الكاميرا. -->
-  <!-- ملاحظة تشغيل 029: إكمال ترتيب القطع يعرض شاشة الفوز. -->
-  <!-- ملاحظة تشغيل 030: زر اللعب مرة أخرى ينشئ ترتيباً جديداً. -->
-  <!-- ملاحظة تشغيل 031: لا تشارك صورة الوجه الملتقطة دون رغبة صاحبها. -->
-  <!-- ملاحظة تشغيل 032: المعالجة تتم داخل صفحة المتصفح في هذا النموذج. -->
-  <!-- ملاحظة تشغيل 033: لا يوجد رفع للصورة إلى خادم تطبيق مخصص في هذا الكود. -->
-  <!-- ملاحظة تشغيل 034: تعتمد مكتبات الرؤية على تنزيل ملفات النموذج من CDN. -->
-  <!-- ملاحظة تشغيل 035: قد يمنع مانع المحتوى تنزيل ملفات CDN. -->
-  <!-- ملاحظة تشغيل 036: قد تختلف سرعة المعالجة حسب إمكانيات الهاتف. -->
-  <!-- ملاحظة تشغيل 037: يمكن خفض الدقة المطلوبة من إعدادات قيود الكاميرا. -->
-  <!-- ملاحظة تشغيل 038: يمكن تقليل تكرار معالجة الإطارات لتخفيف الحمل. -->
-  <!-- ملاحظة تشغيل 039: حافظ على الملف كاملاً ولا تحذف وسوم script. -->
-  <!-- ملاحظة تشغيل 040: حافظ على ترتيب تحميل مكتبات MediaPipe قبل كود التطبيق. -->
-  <!-- ملاحظة تشغيل 041: أي تعديل في CSS لا يجب أن يحذف عنصر الفيديو. -->
-  <!-- ملاحظة تشغيل 042: أي تعديل في HTML يجب أن يحافظ على معرفات العناصر. -->
-  <!-- ملاحظة تشغيل 043: المعرفات مستخدمة مباشرة من دوال JavaScript. -->
-  <!-- ملاحظة تشغيل 044: لا تكرر معرف العنصر نفسه في الصفحة. -->
-  <!-- ملاحظة تشغيل 045: تأكد من إغلاق عناصر HTML عند تعديل الهيكل. -->
-  <!-- ملاحظة تشغيل 046: افحص Console في Chrome إذا ظهر خطأ JavaScript. -->
-  <!-- ملاحظة تشغيل 047: رسالة الخطأ الحمراء في شاشة البداية تساعد على التشخيص. -->
-  <!-- ملاحظة تشغيل 048: إذا كانت الكاميرا تعمل وAI لا يعمل فالمشكلة غالباً CDN. -->
-  <!-- ملاحظة تشغيل 049: إذا لم تظهر الكاميرا فابدأ بفحص الإذن والسياق الآمن. -->
-  <!-- ملاحظة تشغيل 050: localhost وHTTPS هما الخياران المناسبان للوصول للكاميرا. -->
-  <!-- PUZZLE CAM maintenance note 001: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 002: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 003: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 004: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 005: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 006: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 007: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 008: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 009: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 010: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 011: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 012: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 013: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 014: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 015: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 016: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 017: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 018: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 019: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 020: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 021: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 022: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 023: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 024: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 025: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 026: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 027: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 028: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 029: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 030: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 031: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 032: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 033: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 034: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 035: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 036: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 037: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 038: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 039: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 040: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 041: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 042: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 043: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 044: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 045: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 046: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 047: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 048: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 049: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 050: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 051: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 052: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 053: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 054: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 055: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 056: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 057: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 058: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 059: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 060: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 061: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 062: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 063: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 064: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 065: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 066: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 067: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 068: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 069: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 070: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 071: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 072: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 073: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 074: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 075: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 076: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 077: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 078: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 079: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 080: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 081: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 082: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 083: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 084: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 085: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 086: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 087: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 088: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 089: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 090: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 091: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 092: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 093: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 094: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 095: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 096: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 097: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 098: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 099: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 100: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 101: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 102: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 103: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 104: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 105: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 106: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 107: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 108: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 109: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 110: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 111: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 112: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 113: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 114: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 115: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 116: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 117: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 118: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 119: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 120: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 121: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 122: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 123: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 124: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 125: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 126: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 127: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 128: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 129: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 130: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 131: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 132: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 133: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 134: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 135: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 136: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 137: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 138: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 139: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 140: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 141: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 142: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 143: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 144: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 145: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 146: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 147: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 148: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 149: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 150: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 151: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 152: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 153: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 154: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 155: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 156: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 157: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 158: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 159: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 160: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 161: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 162: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 163: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 164: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 165: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 166: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 167: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 168: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 169: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 170: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 171: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 172: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 173: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 174: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 175: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 176: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 177: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 178: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM maintenance note 179: keep camera, face scan, countdown, and puzzle stages connected. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1072. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1073. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1074. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1075. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1076. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1077. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1078. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1079. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1080. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1081. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1082. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1083. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1084. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1085. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1086. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1087. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1088. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1089. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1090. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1091. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1092. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1093. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1094. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1095. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1096. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1097. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1098. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1099. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1100. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1101. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1102. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1103. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1104. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1105. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1106. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1107. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1108. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1109. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1110. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1111. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1112. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1113. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1114. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1115. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1116. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1117. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1118. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1119. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1120. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1121. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1122. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1123. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1124. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1125. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1126. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1127. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1128. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1129. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1130. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1131. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1132. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1133. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1134. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1135. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1136. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1137. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1138. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1139. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1140. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1141. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1142. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1143. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1144. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1145. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1146. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1147. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1148. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1149. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1150. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1151. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1152. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1153. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1154. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1155. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1156. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1157. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1158. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1159. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1160. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1161. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1162. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1163. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1164. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1165. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1166. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1167. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1168. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1169. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1170. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1171. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1172. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1173. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1174. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1175. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1176. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1177. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1178. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1179. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1180. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1181. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1182. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1183. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1184. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1185. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1186. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1187. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1188. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1189. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1190. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1191. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1192. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1193. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1194. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1195. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1196. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1197. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1198. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1199. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1200. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1201. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1202. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1203. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1204. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1205. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1206. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1207. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1208. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1209. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1210. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1211. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1212. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1213. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1214. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1215. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1216. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1217. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1218. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1219. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1220. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1221. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1222. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1223. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1224. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1225. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1226. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1227. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1228. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1229. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1230. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1231. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1232. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1233. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1234. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1235. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1236. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1237. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1238. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1239. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1240. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1241. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1242. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1243. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1244. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1245. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1246. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1247. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1248. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1249. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1250. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1251. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1252. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1253. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1254. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1255. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1256. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1257. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1258. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1259. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1260. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1261. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1262. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1263. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1264. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1265. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1266. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1267. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1268. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1269. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1270. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1271. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1272. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1273. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1274. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1275. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1276. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1277. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1278. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1279. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1280. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1281. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1282. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1283. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1284. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1285. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1286. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1287. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1288. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1289. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1290. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1291. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1292. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1293. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1294. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1295. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1296. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1297. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1298. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1299. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1300. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1301. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1302. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1303. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1304. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1305. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1306. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1307. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1308. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1309. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1310. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1311. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1312. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1313. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1314. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1315. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1316. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1317. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1318. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1319. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1320. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1321. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1322. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1323. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1324. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1325. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1326. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1327. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1328. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1329. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1330. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1331. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1332. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1333. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1334. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1335. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1336. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1337. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1338. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1339. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1340. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1341. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1342. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1343. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1344. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1345. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1346. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1347. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1348. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1349. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1350. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1351. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1352. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1353. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1354. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1355. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1356. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1357. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1358. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1359. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1360. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1361. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1362. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1363. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1364. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1365. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1366. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1367. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1368. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1369. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1370. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1371. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1372. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1373. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1374. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1375. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1376. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1377. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1378. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1379. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1380. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1381. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1382. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1383. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1384. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1385. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1386. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1387. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1388. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1389. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1390. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1391. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1392. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1393. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1394. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1395. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1396. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1397. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1398. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1399. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1400. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1401. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1402. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1403. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1404. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1405. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1406. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1407. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1408. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1409. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1410. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1411. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1412. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1413. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1414. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1415. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1416. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1417. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1418. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1419. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1420. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1421. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1422. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1423. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1424. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1425. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1426. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1427. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1428. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1429. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1430. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1431. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1432. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1433. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1434. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1435. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1436. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1437. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1438. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1439. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1440. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1441. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1442. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1443. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1444. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1445. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1446. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1447. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1448. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1449. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1450. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1451. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1452. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1453. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1454. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1455. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1456. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1457. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1458. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1459. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1460. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1461. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1462. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1463. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1464. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1465. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1466. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1467. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1468. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1469. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1470. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1471. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1472. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1473. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1474. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1475. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1476. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1477. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1478. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1479. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1480. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1481. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1482. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1483. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1484. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1485. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1486. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1487. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1488. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1489. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1490. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1491. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1492. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1493. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1494. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1495. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1496. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1497. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1498. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1499. -->
-  <!-- PUZZLE CAM source maintenance / documentation line 1500. -->
 </body>
 </html>
